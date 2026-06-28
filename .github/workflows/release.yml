@@ -19,16 +19,16 @@ jobs:
         include:
           - os: windows-latest
             target: bun-windows-x64
-            artifact: ankara-connector-windows-x64.exe
+            artifact: ankara-connector-1.0.1-windows-x64.exe
           - os: macos-latest
             target: bun-darwin-arm64
-            artifact: ankara-connector-macos-arm64
+            artifact: ankara-connector-1.0.1-macos-arm64
           - os: macos-13
             target: bun-darwin-x64
-            artifact: ankara-connector-macos-x64
+            artifact: ankara-connector-1.0.1-macos-x64
           - os: ubuntu-latest
             target: bun-linux-x64
-            artifact: ankara-connector-linux-x64
+            artifact: ankara-connector-1.0.1-linux-x64
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2

@@ -11,12 +11,11 @@ export interface PrintResult {
   error?: string;
 }
 
-export async function printJob(
+export async function sendRawBytes(
   target: { host: string; port: number },
-  job: PrintJob,
+  data: Uint8Array,
   timeoutMs = 8000,
 ): Promise<PrintResult> {
-  const data = encodeJob(job);
   return new Promise((resolve) => {
     let settled = false;
     const done = (r: PrintResult) => {
@@ -39,4 +38,13 @@ export async function printJob(
     socket.on('error', (e: Error) => done({ ok: false, bytes: 0, error: e.message }));
     socket.on('close', () => done({ ok: true, bytes: data.byteLength }));
   });
+}
+
+export async function printJob(
+  target: { host: string; port: number },
+  job: PrintJob,
+  timeoutMs = 8000,
+): Promise<PrintResult> {
+  const data = encodeJob(job);
+  return sendRawBytes(target, data, timeoutMs);
 }

@@ -6,8 +6,8 @@
 // /health returns JSON for panel presence detection. This is the only native
 // UI — deliberately minimal (brand + state + capabilities), per product spec.
 
-import type { CommandMessage, AckMessage, Capability } from './protocol';
-import { parseMessage, makeAck, makeAckError, encode } from './protocol';
+import type { CommandMessage, AckMessage, Capability, HelloMessage, AgentInfo } from './protocol';
+import { parseMessage, makeAck, makeAckError, encode, PROTOCOL_VERSION } from './protocol';
 
 export interface AgentStatus {
   paired: boolean;
@@ -48,11 +48,31 @@ const HTML = (s: AgentStatus) => `<!doctype html><html lang="tr"><head><meta cha
     ${s.capabilities.map((c) => `<span class="pill">${c}</span>`).join('')}</div></div>
 </div></body></html>`;
 
-export function startStatusServer(port: number, status: () => AgentStatus, handler: (cap: Capability) => CommandHandler | null): void {
+export function startStatusServer(
+  port: number,
+  status: () => AgentStatus,
+  handler: (cap: Capability) => CommandHandler | null,
+  agent: () => AgentInfo,
+): void {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+
   Bun.serve({
     port,
     websocket: {
-      open() {},
+      open(ws) {
+        const s = status();
+        const hello: HelloMessage = {
+          kind: 'hello',
+          v: PROTOCOL_VERSION,
+          agent: agent(),
+          capabilities: s.capabilities,
+        };
+        ws.send(encode(hello));
+      },
       async message(ws, msg) {
         const text = typeof msg === 'string' ? msg : new TextDecoder().decode(msg as ArrayBuffer);
         const parsed = parseMessage(text);
@@ -85,11 +105,16 @@ export function startStatusServer(port: number, status: () => AgentStatus, handl
 
     fetch(req, server) {
       const url = new URL(req.url);
+      if (req.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
       if (url.pathname === '/health') {
-        return Response.json({ ok: true, ...status() });
+        return Response.json({ ok: true, ...status() }, { headers: corsHeaders });
       }
       if (url.pathname === '/' || url.pathname === '/index.html') {
-        return new Response(HTML(status()), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+        return new Response(HTML(status()), {
+          headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders },
+        });
       }
       if (server.upgrade(req)) return;
       return new Response('Not Found', { status: 404 });

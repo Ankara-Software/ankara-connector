@@ -4,7 +4,7 @@
 import { $ } from 'bun';
 
 const ENTRY = 'src/index.ts';
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 
 interface Target {
   id: string;

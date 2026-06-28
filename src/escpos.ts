@@ -73,3 +73,10 @@ export function encodeJob(job: PrintJob): Uint8Array {
 
   return new Uint8Array(out);
 }
+
+/** ESC p m t1 t2 — pulse cash drawer (pin 2, 50 ms on / 50 ms off). */
+export function encodeDrawerKick(pin: 0 | 1 = 1, onMs = 50, offMs = 50): Uint8Array {
+  const t1 = Math.min(255, Math.max(0, Math.round(onMs / 2)));
+  const t2 = Math.min(255, Math.max(0, Math.round(offMs / 2)));
+  return new Uint8Array([ESC, 0x70, pin, t1, t2]);
+}

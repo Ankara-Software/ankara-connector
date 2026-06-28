@@ -5,7 +5,8 @@
 import { loadConfig, saveConfig } from './config';
 import { agentInfo, advertisedCapabilities, rotateToken } from './pair';
 import { startStatusServer, type AgentStatus, type CommandHandler } from './status';
-import { printJob } from './printer';
+import { printJob, sendRawBytes } from './printer';
+import { encodeDrawerKick } from './escpos';
 import type { Capability, CommandMessage } from './protocol';
 
 const ROTATE_INTERVAL_MS = 1000 * 60 * 45; // rotate before typical 1h expiry
@@ -40,7 +41,7 @@ export async function runAgent(): Promise<void> {
     return null;
   };
 
-  startStatusServer(cfg.statusPort, status, handler);
+  startStatusServer(cfg.statusPort, status, handler, () => info);
 
   // Background token rotation.
   setInterval(async () => {
@@ -95,10 +96,9 @@ const handleLabel: CommandHandler = async (cmd: CommandMessage) => {
 const handleDrawer: CommandHandler = async () => {
   const cfg = loadConfig();
   if (!cfg.printer) return { error: { code: 'device_error', message: 'Yazıcı yapılandırılmamış.' } };
-  // ESC p m t1 t2 — kick drawer #2 (pulse 50ms on, 50ms off)
-  const r = await printJob(cfg.printer, { lines: [], cut: false, codePage: cfg.printer.codePage });
-  void r;
-  return { payload: { kicked: true } };
+  const r = await sendRawBytes(cfg.printer, encodeDrawerKick(1, 50, 50));
+  if (!r.ok) return { error: { code: 'device_error', message: r.error || 'Para çekmecesi açılamadı' } };
+  return { payload: { kicked: true, bytes: r.bytes } };
 };
 
 const handleScan: CommandHandler = async (cmd: CommandMessage) => {
