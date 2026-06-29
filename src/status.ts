@@ -40,14 +40,14 @@ const HTML = (s: AgentStatus) => `<!doctype html><html lang="tr"><head><meta cha
   body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0b1220;color:#e6edf7;margin:0;padding:40px}
   .card{max-width:640px;margin:0 auto;border:1px solid #1f2d44;border-radius:16px;padding:32px;background:#0f172a}
   .brand{display:flex;align-items:center;gap:12px;margin-bottom:24px}
-  .dot{width:40px;height:40px;border-radius:10px;background:#002147;display:flex;align-items:center;justify-content:center;color:#c9a14a;font-weight:700}
+  .brand img{height:40px;width:auto}
   h1{font-size:20px;margin:0}
   .row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #16203a;font-size:14px}
   .row span:last-child{color:#9fb3cf;text-align:right}
   .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:#13203a;border:1px solid #1f2d44;font-size:12px;margin:3px 4px 0 0}
   .ok{color:#34d399}.warn{color:#fbbf24}
 </style></head><body><div class="card">
-  <div class="brand"><div class="dot">A</div><h1>Ankara Yazılım Connector</h1></div>
+  <div class="brand"><img src="https://ankarayazilim.org/ankara-yazilim.png" alt="Ankara Yazılım" width="160" height="40"/><h1>Connector</h1></div>
   <div class="row"><span>Durum</span><span class="${s.paired ? 'ok' : 'warn'}">${s.paired ? 'Bağlı' : 'Oturum bekleniyor'}</span></div>
   <div class="row"><span>Cihaz</span><span>${s.deviceId ?? '—'}</span></div>
   <div class="row"><span>Etiket</span><span>${s.label ?? '—'}</span></div>

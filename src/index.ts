@@ -13,7 +13,7 @@
 import { loadConfig, saveConfig, defaultConfig } from './config';
 import { runAgent } from './agent';
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 
 async function main(): Promise<void> {
   const cmd = process.argv[2] ?? 'run';
