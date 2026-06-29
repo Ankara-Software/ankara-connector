@@ -23,6 +23,7 @@ export const CAPABILITIES = [
   'camera.onvif',
   'quality.audit',
   'signature.esign',
+  'uyap.bridge',
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 

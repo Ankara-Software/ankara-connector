@@ -9,6 +9,7 @@
 import type { CommandMessage, AckMessage, Capability, HelloMessage, AgentInfo } from './protocol';
 import { parseMessage, makeAck, makeAckError, encode, PROTOCOL_VERSION } from './protocol';
 import { deliverAuthCallback, type AuthCallbackPayload } from './auth-flow';
+import { loadConfig } from './config';
 
 /** Origins allowed to POST device tokens to the localhost callback (web auth page). */
 const AUTH_CALLBACK_ORIGINS = new Set([
@@ -188,6 +189,23 @@ export function startStatusServer(
       }
       if (url.pathname === '/health') {
         return Response.json({ ok: true, ...status() }, { headers: corsHeaders });
+      }
+      if (url.pathname === '/extension/session') {
+        const cfg = loadConfig();
+        if (!cfg.token || !cfg.deviceId) {
+          return Response.json({ paired: false }, { headers: corsHeaders });
+        }
+        return Response.json(
+          {
+            paired: true,
+            token: cfg.token,
+            deviceId: cfg.deviceId,
+            apiBase: cfg.apiBase.replace(/\/$/, ''),
+            tenantName: cfg.tenantName ?? null,
+            label: cfg.label ?? null,
+          },
+          { headers: corsHeaders },
+        );
       }
       if (url.pathname === '/' || url.pathname === '/index.html') {
         return new Response(HTML(status()), {

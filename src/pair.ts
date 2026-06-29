@@ -62,13 +62,9 @@ export function agentInfo(): AgentInfo {
 }
 
 export function advertisedCapabilities(cfg: ConnectorConfig): Capability[] {
-  // Advertise what this build can actually do on this device. Printer requires
-  // a configured network printer; barcode/qr scan events are emitted on demand.
-  const caps: Capability[] = ['scanner.barcode', 'scanner.qr'];
+  const caps: Capability[] = ['scanner.barcode', 'scanner.qr', 'uyap.bridge'];
   if (cfg.printer) {
     caps.push('printer.escpos', 'printer.label', 'drawer.kick');
   }
-  // e-signature is part of the contract but not yet implemented (NES SDK).
-  // Not advertised until shipped — honest capability manifest.
   return caps;
 }
