@@ -54,7 +54,7 @@ bun test
 
 ## Sürümleme
 
-`git tag v*` push → `release.yml` workflow matrix (windows/macos-arm64/macos-x64/linux)
+`git tag v*` push → `release.yml` on s31 (cross-compile windows/macos-arm64/macos-x64/linux)
 üzerinde derler ve GitHub Release'e ikili + `sha256sums.txt` olarak yükler.
 
 ## Lisans
