@@ -35,7 +35,7 @@ jobs:
 
   build-windows:
     name: build Windows tray + installer
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, s18]
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -55,7 +55,7 @@ jobs:
 
   release:
     needs: [build-unix, build-windows]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, s31]
     permissions:
       contents: write
     steps:
