@@ -1,7 +1,7 @@
 {
   "name": "ankara-connector",
-  "version": "1.0.1",
-  "description": "Ankara Yazılım Bağlayıcı (Connector) — fiziksel donanımı panellerle köprüleyen headless agent.",
+  "version": "1.1.0",
+  "description": "Ankara Yazılım Connector — fiziksel donanımı panellerle köprüleyen headless agent.",
   "type": "module",
   "private": true,
   "bin": {

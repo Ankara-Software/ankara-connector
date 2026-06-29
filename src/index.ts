@@ -1,86 +1,73 @@
 #!/usr/bin/env bun
-// Ankara Yazılım Bağlayıcı — CLI entry.
+// Ankara Yazılım Connector — CLI entry.
 //
-//   ankara-connector pair <kod> [--api https://...] [--label "Kasa 1"]
+// Default (no args): start the agent — opens web auth if not yet paired.
+//   ankara-connector
 //   ankara-connector run
+//
+// Optional maintenance (hidden from end-user docs):
 //   ankara-connector status
-//   ankara-connector printer <host[:port]> [--codepage 0]
+//   ankara-connector logout
 //   ankara-connector version
 
-import { loadConfig, saveConfig, type PrinterConfig } from './config';
-import { pairDevice, agentInfo, advertisedCapabilities } from './pair';
+import { loadConfig, saveConfig, defaultConfig } from './config';
 import { runAgent } from './agent';
 
-function arg(name: string): string | null {
-  const i = process.argv.indexOf(name);
-  return i >= 0 && i + 1 < process.argv.length ? (process.argv[i + 1] ?? null) : null;
-}
+const VERSION = '1.1.0';
 
 async function main(): Promise<void> {
-  const cmd = process.argv[2] ?? 'help';
-  const cfg = loadConfig();
+  const cmd = process.argv[2] ?? 'run';
 
   switch (cmd) {
     case 'version':
-      console.log('ankara-connector 1.0.0');
+    case '-v':
+    case '--version':
+      console.log(`ankara-connector ${VERSION}`);
       return;
-
-    case 'pair': {
-      const code = process.argv[3];
-      if (!code) {
-        console.error('Kullanım: ankara-connector pair <kod> [--api URL] [--label AD]');
-        process.exit(1);
-      }
-      const apiBase = arg('--api') ?? cfg.apiBase;
-      const label = arg('--label');
-      const info = agentInfo();
-      const caps = advertisedCapabilities({ ...cfg, printer: cfg.printer });
-      const r = await pairDevice({ apiBase, code, agent: info, capabilities: caps, label: label ?? undefined });
-      if (!r.ok) {
-        console.error(r.error);
-        process.exit(1);
-      }
-      const next = { ...cfg, apiBase, token: r.token, deviceId: r.deviceId, label: label ?? cfg.label };
-      saveConfig(next);
-      console.log(`Eşleştirme başarılı. Cihaz kimliği: ${r.deviceId}`);
-      console.log('Belirteç güvenli şekilde kaydedildi. Şimdi `ankara-connector run` çalıştırın.');
-      return;
-    }
-
-    case 'printer': {
-      const target = process.argv[3];
-      if (!target) {
-        console.error('Kullanım: ankara-connector printer <host[:port]> [--codepage 0]');
-        process.exit(1);
-      }
-      const [host, portStr] = target.split(':');
-      const port = Number(portStr ?? '9100');
-      const codePage = Number(arg('--codepage') ?? '0');
-      const printer: PrinterConfig = { host, port, codePage };
-      saveConfig({ ...cfg, printer });
-      console.log(`Yazıcı kaydedildi: ${host}:${port} (codePage ${codePage})`);
-      return;
-    }
 
     case 'status': {
+      const cfg = loadConfig();
       console.log(JSON.stringify(cfg, null, 2));
       return;
     }
 
-    case 'run': {
-      await runAgent();
+    case 'logout': {
+      const cfg = loadConfig();
+      saveConfig({
+        ...defaultConfig(),
+        apiBase: cfg.apiBase,
+        statusPort: cfg.statusPort,
+        printer: cfg.printer,
+      });
+      console.log('Yerel oturum silindi. Connector’ı yeniden başlattığınızda tarayıcıda oturum açmanız istenecek.');
       return;
     }
 
-    default:
-      console.log(`Ankara Yazılım Bağlayıcı
+    case 'run':
+    case 'start':
+    case 'help':
+    case '-h':
+    case '--help':
+      if (cmd === 'help' || cmd === '-h' || cmd === '--help') {
+        console.log(`Ankara Yazılım Connector ${VERSION}
 
 Kullanım:
-  ankara-connector pair <kod> [--api URL] [--label AD]   Cihazı panele eşleştir
-  ankara-connector run                                    Arka planda çalıştır
-  ankara-connector status                                 Yapılandırmayı göster
-  ankara-connector printer <host[:port]> [--codepage N]   Ağ yazıcısı tanıt
-  ankara-connector version                                Sürümü göster`);
+  ankara-connector              Başlat (ilk seferde tarayıcıda oturum açma sayfası açılır)
+  ankara-connector logout       Yerel oturumu sıfırla
+  ankara-connector status       Yerel yapılandırmayı göster
+  ankara-connector version      Sürümü göster
+
+Oturum kalıcıdır — bir kez giriş yaptıktan sonra kim olduğunuzu ve hangi
+firmaya bağlı olduğunuzu hatırlar. Tüm cihaz ayarları web panelden yapılır.`);
+        return;
+      }
+      await runAgent();
+      return;
+
+    default:
+      console.error(`Bilinmeyen komut: ${cmd}`);
+      console.error('Kullanım: ankara-connector [--help]');
+      process.exit(1);
   }
 }
 

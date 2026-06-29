@@ -9,6 +9,10 @@ export interface ConnectorConfig {
   token: string | null;
   deviceId: string | null;
   label: string | null;
+  /** Tenant display name from web auth (informational). */
+  tenantName: string | null;
+  /** ISO timestamp when this device was paired via web auth. */
+  pairedAt: string | null;
   printer: PrinterConfig | null;
   statusPort: number;
 }
@@ -32,6 +36,8 @@ export function defaultConfig(): ConnectorConfig {
     token: null,
     deviceId: null,
     label: null,
+    tenantName: null,
+    pairedAt: null,
     printer: null,
     statusPort: 4781,
   };
