@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (required for workflow_dispatch)'
+        required: true
+        default: 'v1.1.0'
 
 permissions:
   contents: write
@@ -61,6 +66,7 @@ jobs:
       - name: Create / attach release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           generate_release_notes: true
           files: |
             dist/*
