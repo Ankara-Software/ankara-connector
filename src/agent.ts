@@ -9,6 +9,7 @@ import { startStatusServer, type AgentStatus, type CommandHandler } from './stat
 import { printJob, sendRawBytes } from './printer';
 import { encodeDrawerKick } from './escpos';
 import { waitForWebAuth, cancelAllPendingAuth } from './auth-flow';
+import { startAutoUpdateLoop } from './update';
 import type { Capability, CommandMessage } from './protocol';
 
 const ROTATE_INTERVAL_MS = 1000 * 60 * 45;
@@ -86,6 +87,8 @@ export async function runAgent(): Promise<void> {
     'Panelden komut bekleniyor (ws://127.0.0.1:%d). Oturum kalıcıdır — çıkmak için Ctrl+C.',
     current.statusPort,
   );
+
+  startAutoUpdateLoop(current);
 
   await new Promise(() => {});
 }

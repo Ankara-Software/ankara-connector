@@ -5,6 +5,7 @@
 
 import type { ConnectorConfig } from './config';
 import type { Capability, AgentInfo } from './protocol';
+import { CONNECTOR_VERSION } from './version';
 
 interface PairResponse {
   success?: boolean;
@@ -58,7 +59,7 @@ export function agentInfo(): AgentInfo {
     : platform.startsWith('darwin')
       ? 'macos'
       : 'linux';
-  return { name: 'ankara-connector', version: '1.1.1', os };
+  return { name: 'ankara-connector', version: CONNECTOR_VERSION, os };
 }
 
 export function advertisedCapabilities(cfg: ConnectorConfig): Capability[] {

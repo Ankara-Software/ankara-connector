@@ -12,8 +12,10 @@
 
 import { loadConfig, saveConfig, defaultConfig } from './config';
 import { runAgent } from './agent';
+import { CONNECTOR_VERSION } from './version';
+import { stageUpdateIfAvailable, tryApplyStoredUpdate } from './update';
 
-const VERSION = '1.1.1';
+const VERSION = CONNECTOR_VERSION;
 
 async function main(): Promise<void> {
   const cmd = process.argv[2] ?? 'run';
@@ -45,23 +47,32 @@ async function main(): Promise<void> {
 
     case 'run':
     case 'start':
+      await tryApplyStoredUpdate();
+      await runAgent();
+      return;
+
+    case 'update-check': {
+      const cfg = loadConfig();
+      const pending = await stageUpdateIfAvailable(cfg);
+      if (!pending) console.log('Güncelleme yok veya indirilemedi.');
+      return;
+    }
+
     case 'help':
     case '-h':
     case '--help':
-      if (cmd === 'help' || cmd === '-h' || cmd === '--help') {
-        console.log(`Ankara Yazılım Connector ${VERSION}
+      console.log(`Ankara Yazılım Connector ${VERSION}
 
 Kullanım:
   ankara-connector              Başlat (ilk seferde tarayıcıda oturum açma sayfası açılır)
   ankara-connector logout       Yerel oturumu sıfırla
   ankara-connector status       Yerel yapılandırmayı göster
   ankara-connector version      Sürümü göster
+  ankara-connector update-check Güncelleme kontrolü (doğrulanmış indirme)
 
 Oturum kalıcıdır — bir kez giriş yaptıktan sonra kim olduğunuzu ve hangi
-firmaya bağlı olduğunuzu hatırlar. Tüm cihaz ayarları web panelden yapılır.`);
-        return;
-      }
-      await runAgent();
+firmaya bağlı olduğunuzu hatırlar. Tüm cihaz ayarları web panelden yapılır.
+Güncellemeler SHA-256 doğrulaması sonrası yeniden başlatmada uygulanır.`);
       return;
 
     default:

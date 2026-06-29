@@ -15,6 +15,8 @@ export interface ConnectorConfig {
   pairedAt: string | null;
   printer: PrinterConfig | null;
   statusPort: number;
+  /** Verified update staged for next restart. */
+  pendingUpdate?: import('./update.js').PendingUpdate | null;
 }
 
 export interface PrinterConfig {
