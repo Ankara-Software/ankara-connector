@@ -30,13 +30,18 @@ export async function sendRawBytes(
       resolve(r);
     };
     const socket = createConnection({ host: target.host, port: target.port }, () => {
-      socket.write(Buffer.from(data), () => {
-        done({ ok: true, bytes: data.byteLength });
+      socket.write(Buffer.from(data), (err) => {
+        if (err) {
+          done({ ok: false, bytes: 0, error: err.message });
+          return;
+        }
+        socket.end(() => {
+          done({ ok: true, bytes: data.byteLength });
+        });
       });
     });
     const timer = setTimeout(() => done({ ok: false, bytes: 0, error: 'Yazıcı zaman aşımı' }), timeoutMs);
     socket.on('error', (e: Error) => done({ ok: false, bytes: 0, error: e.message }));
-    socket.on('close', () => done({ ok: true, bytes: data.byteLength }));
   });
 }
 

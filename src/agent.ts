@@ -101,6 +101,10 @@ interface PrintPayload {
 }
 
 const handlePrint: CommandHandler = async (cmd: CommandMessage) => {
+  const action = String(cmd.action || 'print');
+  if (action !== 'print') {
+    return { error: { code: 'unsupported_action', message: `printer.escpos.${action} desteklenmiyor.` } };
+  }
   const cfg = loadConfig();
   if (!cfg.printer) return { error: { code: 'device_error', message: 'Yazıcı yapılandırılmamış. Panelden tanımlayın.' } };
   const p = (cmd.payload ?? {}) as PrintPayload;
@@ -116,6 +120,10 @@ const handlePrint: CommandHandler = async (cmd: CommandMessage) => {
 };
 
 const handleLabel: CommandHandler = async (cmd: CommandMessage) => {
+  const action = String(cmd.action || 'print');
+  if (action !== 'print' && action !== 'label') {
+    return { error: { code: 'unsupported_action', message: `printer.label.${action} desteklenmiyor.` } };
+  }
   const cfg = loadConfig();
   if (!cfg.printer) return { error: { code: 'device_error', message: 'Yazıcı yapılandırılmamış. Panelden tanımlayın.' } };
   const p = (cmd.payload ?? {}) as { text?: string };
@@ -124,7 +132,11 @@ const handleLabel: CommandHandler = async (cmd: CommandMessage) => {
   return { payload: { bytes: r.bytes } };
 };
 
-const handleDrawer: CommandHandler = async () => {
+const handleDrawer: CommandHandler = async (cmd: CommandMessage) => {
+  const action = String(cmd.action || 'kick');
+  if (action !== 'kick') {
+    return { error: { code: 'unsupported_action', message: `drawer.kick.${action} desteklenmiyor.` } };
+  }
   const cfg = loadConfig();
   if (!cfg.printer) return { error: { code: 'device_error', message: 'Yazıcı yapılandırılmamış. Panelden tanımlayın.' } };
   const r = await sendRawBytes(cfg.printer, encodeDrawerKick(1, 50, 50));
@@ -133,6 +145,10 @@ const handleDrawer: CommandHandler = async () => {
 };
 
 const handleScan: CommandHandler = async (cmd: CommandMessage) => {
+  const action = String(cmd.action || 'scan');
+  if (action !== 'scan' && action !== 'capture') {
+    return { error: { code: 'unsupported_action', message: `scanner.${action} desteklenmiyor.` } };
+  }
   const p = (cmd.payload ?? {}) as { code?: string };
   if (!p.code) return { error: { code: 'bad_message', message: 'Tarama verisi (code) gerekli.' } };
   return { payload: { code: p.code, capturedAt: new Date().toISOString() } };

@@ -63,7 +63,7 @@ export function agentInfo(): AgentInfo {
 }
 
 export function advertisedCapabilities(cfg: ConnectorConfig): Capability[] {
-  const caps: Capability[] = ['scanner.barcode', 'scanner.qr', 'uyap.bridge'];
+  const caps: Capability[] = ['scanner.barcode', 'scanner.qr'];
   if (cfg.printer) {
     caps.push('printer.escpos', 'printer.label', 'drawer.kick');
   }

@@ -105,6 +105,16 @@ function isCapability(x: unknown): x is Capability {
 
 export type ParseResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: { code: string; message: string } };
 
+export function decode(text: string): ParseResult<ConnectorMessage> {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { ok: false, error: { code: 'bad_message', message: 'invalid JSON' } };
+  }
+  return parseMessage(raw);
+}
+
 export function parseMessage(raw: unknown): ParseResult<ConnectorMessage> {
   if (!isObject(raw)) return { ok: false, error: { code: 'bad_message', message: 'message must be an object' } };
   if (typeof raw['v'] !== 'number' || !Number.isInteger(raw['v']) || raw['v'] <= 0) {

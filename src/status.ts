@@ -6,10 +6,10 @@
 // /health returns JSON for panel presence detection. This is the only native
 // UI — deliberately minimal (brand + state + capabilities), per product spec.
 
-import type { CommandMessage, AckMessage, Capability, HelloMessage, AgentInfo } from './protocol';
-import { parseMessage, makeAck, makeAckError, encode, PROTOCOL_VERSION } from './protocol';
+import type { CommandMessage, AckMessage, Capability, HelloMessage, AgentInfo, EventMessage } from './protocol';
+import { decode, makeAck, makeAckError, encode, PROTOCOL_VERSION, makeEvent } from './protocol';
 import { deliverAuthCallback, type AuthCallbackPayload } from './auth-flow';
-import { loadConfig } from './config';
+import { loadConfig, saveConfig, type PrinterConfig } from './config';
 
 /** Origins allowed to POST device tokens to the localhost callback (web auth page). */
 const AUTH_CALLBACK_ORIGINS = new Set([
@@ -32,6 +32,21 @@ export interface AgentStatus {
 export type CommandHandler = (
   cmd: CommandMessage,
 ) => Promise<{ payload?: unknown; error?: { code: string; message: string } }>;
+
+/** Connected panel WebSocket clients — receive unsolicited hardware events. */
+const wsClients = new Set<{ send: (data: string) => void }>();
+
+export function broadcastConnectorEvent(cap: Capability, event: string, payload?: unknown): void {
+  const msg = makeEvent(cap, event, payload);
+  const wire = encode(msg);
+  for (const ws of wsClients) {
+    try {
+      ws.send(wire);
+    } catch {
+      wsClients.delete(ws);
+    }
+  }
+}
 
 const HTML = (s: AgentStatus) => `<!doctype html><html lang="tr"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -99,6 +114,7 @@ export function startStatusServer(
     port,
     websocket: {
       open(ws) {
+        wsClients.add(ws);
         const s = status();
         const hello: HelloMessage = {
           kind: 'hello',
@@ -110,14 +126,13 @@ export function startStatusServer(
       },
       async message(ws, msg) {
         const text = typeof msg === 'string' ? msg : new TextDecoder().decode(msg as ArrayBuffer);
-        const parsed = parseMessage(text);
+        const parsed = decode(text);
         if (!parsed.ok) {
-          ws.send(encode(makeAckError('bad-json', parsed.error.message)));
+          ws.send(encode(makeAckError('bad-json', parsed.error.code, parsed.error.message)));
           return;
         }
         const m = parsed.value;
         if (m.kind !== 'command') {
-          // We only accept commands from the panel; events flow the other way.
           return;
         }
         const h = handler(m.cap);
@@ -135,7 +150,9 @@ export function startStatusServer(
           ws.send(encode(makeAckError(m.id, 'device_error', (e as Error).message)));
         }
       },
-      close() {},
+      close(ws) {
+        wsClients.delete(ws);
+      },
     },
 
     fetch(req, server) {
@@ -189,6 +206,43 @@ export function startStatusServer(
       }
       if (url.pathname === '/health') {
         return Response.json({ ok: true, ...status() }, { headers: corsHeaders });
+      }
+      if (url.pathname === '/config/printer') {
+        if (req.method === 'OPTIONS') {
+          return new Response(null, { status: 204, headers: corsHeaders });
+        }
+        if (req.method === 'PUT' || req.method === 'POST') {
+          return req
+            .json()
+            .then((body: unknown) => {
+              const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+              const host = String(b.host || '').trim();
+              const port = Number(b.port ?? 9100);
+              if (!host || !Number.isFinite(port) || port < 1 || port > 65535) {
+                return Response.json(
+                  { ok: false, error: 'Geçerli yazıcı IP/host ve port (1-65535) gerekli.' },
+                  { status: 400, headers: corsHeaders },
+                );
+              }
+              const cfg = loadConfig();
+              const printer: PrinterConfig = {
+                host,
+                port: Math.trunc(port),
+                codePage: b.codePage != null ? Number(b.codePage) : cfg.printer?.codePage,
+              };
+              saveConfig({ ...cfg, printer });
+              return Response.json({ ok: true, printer }, { headers: corsHeaders });
+            })
+            .catch(() =>
+              Response.json({ ok: false, error: 'Geçersiz istek.' }, { status: 400, headers: corsHeaders }),
+            );
+        }
+        if (req.method === 'DELETE') {
+          const cfg = loadConfig();
+          saveConfig({ ...cfg, printer: null });
+          return Response.json({ ok: true, printer: null }, { headers: corsHeaders });
+        }
+        return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
       }
       if (url.pathname === '/extension/session') {
         const cfg = loadConfig();
