@@ -41,9 +41,14 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - name: Install Go + MinGW + NSIS
+      - name: Add Scoop to Path
         run: |
-          choco install golang mingw nsis -y
+          echo "C:\Users\admin\scoop\shims" >> $env:GITHUB_PATH
+      - name: Verify Tools
+        run: |
+          go version
+          gcc --version
+          makensis /VERSION
       - name: Build Windows pack
         env:
           CGO_ENABLED: "1"
