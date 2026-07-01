@@ -10,10 +10,10 @@
 //   ankara-connector logout
 //   ankara-connector version
 
-import { loadConfig, saveConfig, defaultConfig } from './config';
 import { runAgent } from './agent';
-import { CONNECTOR_VERSION } from './version';
+import { defaultConfig, loadConfig, saveConfig } from './config';
 import { stageUpdateIfAvailable, tryApplyStoredUpdate } from './update';
+import { CONNECTOR_VERSION } from './version';
 
 const VERSION = CONNECTOR_VERSION;
 
@@ -71,6 +71,19 @@ async function main(): Promise<void> {
       const cfg = loadConfig();
       const pending = await stageUpdateIfAvailable(cfg);
       if (!pending) console.log('Güncelleme yok veya indirilemedi.');
+      return;
+    }
+
+    case 'trust-cert': {
+      const { loadOrGenerateCert, writeTrustReadme } = await import('./tls-cert');
+      const cert = loadOrGenerateCert();
+      if (!cert) {
+        console.error('Sertifika üretilemedi (openssl kurulu mu?).');
+        process.exit(3);
+      }
+      writeTrustReadme();
+      console.log(`Yerel sertifika: ${cert.certPath}`);
+      console.log('Tarayıcı güveni için README.txt içindeki adımları izleyin.');
       return;
     }
 

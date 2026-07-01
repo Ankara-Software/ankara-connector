@@ -6,8 +6,8 @@
 // which the agent treats as a logout signal. Pure client — the server side
 // lives in the fullstack server submodule (POST /v1/connector/heartbeat).
 
-import { agentInfo, advertisedCapabilities } from './pair';
-import { loadConfig, saveConfig, defaultConfig } from './config';
+import { defaultConfig, loadConfig, saveConfig } from './config';
+import { advertisedCapabilities, agentInfo } from './pair';
 import { CONNECTOR_VERSION } from './version';
 
 const HEARTBEAT_INTERVAL_MS = 1000 * 60 * 3; // 3 minutes
@@ -49,13 +49,17 @@ async function postHeartbeat(cfg: ReturnType<typeof loadConfig>): Promise<Heartb
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.token}` },
       body: JSON.stringify(payload),
     });
-    if (res.status === 401) {
-      // Token revoked from the panel — wipe local session.
+    const json = (await res.json().catch(() => null)) as HeartbeatResponse | null;
+    // Revocation is signalled either by HTTP 401 or by the server's
+    // unauthorized detail (the v1 framework maps user errors to 400, so we
+    // cannot rely on status alone).
+    const revoked = res.status === 401 || json?.error?.message?.includes('iptal edilmiş') || false;
+    if (revoked) {
       console.warn('Connector oturumu panelden kapatılmış. Yerel oturum sıfırlanıyor.');
       saveConfig({ ...defaultConfig(), apiBase: cfg.apiBase, statusPort: cfg.statusPort, printer: cfg.printer });
       return { success: false, data: { revoked: true } };
     }
-    return (await res.json().catch(() => null)) as HeartbeatResponse | null;
+    return json;
   } catch {
     return null; // network errors are non-fatal for heartbeat
   }

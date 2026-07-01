@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
-import { buildHeartbeat } from './heartbeat';
 import { defaultConfig } from './config';
+import { buildHeartbeat } from './heartbeat';
 
 describe('heartbeat', () => {
   test('buildHeartbeat is null when unpaired', () => {

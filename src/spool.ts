@@ -1,9 +1,9 @@
 // Transport wrapper that routes print/drawer commands through the local
 // spooler (roadmap §31) and maps spooler outcomes to customer-facing errors.
 
-import { sendRawBytes as directSendRawBytes } from './printer';
-import { encodeJob, encodeDrawerKick } from './escpos';
+import { encodeDrawerKick, encodeJob } from './escpos';
 import { enqueuePrint, resetPrintQueueState, type PrintQueueJob } from './print-queue';
+import { sendRawBytes as directSendRawBytes } from './printer';
 
 function newId(): string {
   const g = globalThis as { crypto?: { randomUUID?: () => string } };

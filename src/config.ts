@@ -9,7 +9,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { loadSecret, saveSecret, clearSecret } from './secret-store';
+import { clearSecret, loadSecret, saveSecret } from './secret-store';
 
 export interface ConnectorConfig {
   apiBase: string;
@@ -22,6 +22,9 @@ export interface ConnectorConfig {
   pairedAt: string | null;
   printer: PrinterConfig | null;
   statusPort: number;
+  /** Serve the loopback bridge over HTTPS/WSS (roadmap §24). Default off to
+   *  preserve the working ws:// flow until the panel trusts the localhost cert. */
+  tls?: boolean;
   /** Verified update staged for next restart. */
   pendingUpdate?: import('./update.js').PendingUpdate | null;
 }

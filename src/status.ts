@@ -6,10 +6,10 @@
 // /health returns JSON for panel presence detection. This is the only native
 // UI — deliberately minimal (brand + state + capabilities), per product spec.
 
-import type { CommandMessage, AckMessage, Capability, HelloMessage, AgentInfo, EventMessage } from './protocol';
-import { decode, makeAck, makeAckError, encode, PROTOCOL_VERSION, makeEvent } from './protocol';
 import { deliverAuthCallback, type AuthCallbackPayload } from './auth-flow';
 import { loadConfig, saveConfig, type PrinterConfig } from './config';
+import type { AckMessage, AgentInfo, Capability, CommandMessage, HelloMessage } from './protocol';
+import { decode, encode, makeAck, makeAckError, makeEvent, PROTOCOL_VERSION } from './protocol';
 
 /** Origins allowed to talk to the loopback API (roadmap §24, enterprise §1).
  *  Only the production panel + local dev servers may issue commands; a random
@@ -99,6 +99,7 @@ export function startStatusServer(
   status: () => AgentStatus,
   handler: (cap: Capability) => CommandHandler | null,
   agent: () => AgentInfo,
+  tls?: { cert: string; key: string } | null,
 ): void {
   const corsHeadersFor = (origin: string | null): Record<string, string> => {
     if (origin && ALLOWED_ORIGINS.has(origin)) {
@@ -131,6 +132,7 @@ export function startStatusServer(
 
   Bun.serve({
     port,
+    ...(tls ? { tls: { cert: tls.cert, key: tls.key } } : {}),
     websocket: {
       open(ws) {
         wsClients.add(ws);
@@ -290,5 +292,7 @@ export function startStatusServer(
       return new Response('Not Found', { status: 404 });
     },
   });
-  console.log(`Connector durum sunucusu: http://127.0.0.1:${port} (ws://127.0.0.1:${port})`);
+  console.log(
+    `Connector durum sunucusu: ${tls ? 'https' : 'http'}://127.0.0.1:${port} (${tls ? 'wss' : 'ws'}://127.0.0.1:${port})`,
+  );
 }

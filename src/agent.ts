@@ -3,17 +3,18 @@
 // browser to deliver the device token via localhost callback. Session persists
 // in ~/.ankara-connector/config.json across restarts.
 
-import { loadConfig, saveConfig } from './config';
-import { agentInfo, advertisedCapabilities, rotateToken } from './pair';
-import { startStatusServer, type AgentStatus, type CommandHandler } from './status';
-import { spooledPrint, spooledDrawerKick } from './spool';
+import { cancelAllPendingAuth, waitForWebAuth } from './auth-flow';
 import { parseBarcode } from './barcode';
+import { loadConfig, saveConfig } from './config';
 import { customerError } from './errors';
-import { healthErrorKey, encodeHealthRequest, aggregateHealth, type PrinterHealth } from './printer-health';
-import { waitForWebAuth, cancelAllPendingAuth } from './auth-flow';
-import { startAutoUpdateLoop } from './update';
 import { startHeartbeatLoop } from './heartbeat';
+import { advertisedCapabilities, agentInfo, rotateToken } from './pair';
+import { aggregateHealth, encodeHealthRequest, healthErrorKey, type PrinterHealth } from './printer-health';
 import type { Capability, CommandMessage } from './protocol';
+import { spooledDrawerKick, spooledPrint } from './spool';
+import { startStatusServer, type AgentStatus, type CommandHandler } from './status';
+import { startAutoUpdateLoop } from './update';
+import { loadOrGenerateCert, writeTrustReadme } from './tls-cert';
 
 const ROTATE_INTERVAL_MS = 1000 * 60 * 45;
 
@@ -47,7 +48,18 @@ export async function runAgent(): Promise<void> {
   };
 
   // Loopback server must start before web auth (browser POSTs token here).
-  startStatusServer(cfg.statusPort, status, handler, () => agentInfo());
+  let tlsCfg: { cert: string; key: string } | null = null;
+  if (cfg.tls) {
+    const cert = await loadOrGenerateCert();
+    if (cert) {
+      tlsCfg = { cert: cert.cert, key: cert.key };
+      writeTrustReadme();
+      console.log('Loopback TLS etkin (wss://127.0.0.1:%d). Sertifika: %s', cfg.statusPort, cert.certPath);
+    } else {
+      console.warn('TLS istendi ama sertifika üretilemedi (openssl yok?) — ws:// ile devam ediliyor.');
+    }
+  }
+  startStatusServer(cfg.statusPort, status, handler, () => agentInfo(), tlsCfg);
 
   if (!cfg.token) {
     try {
