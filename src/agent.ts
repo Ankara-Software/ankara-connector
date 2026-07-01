@@ -4,17 +4,15 @@
 // in ~/.ankara-connector/config.json across restarts.
 
 import { cancelAllPendingAuth, waitForWebAuth } from './auth-flow';
-import { parseBarcode } from './barcode';
 import { loadConfig, saveConfig } from './config';
-import { customerError } from './errors';
 import { startHeartbeatLoop } from './heartbeat';
 import { advertisedCapabilities, agentInfo, rotateToken } from './pair';
-import { aggregateHealth, encodeHealthRequest, healthErrorKey, type PrinterHealth } from './printer-health';
-import type { Capability, CommandMessage } from './protocol';
-import { spooledDrawerKick, spooledPrint } from './spool';
-import { startStatusServer, type AgentStatus, type CommandHandler } from './status';
-import { startAutoUpdateLoop } from './update';
+import { startPollFallback } from './poll-fallback';
+import { startStatusServer, isPanelWsConnected, type AgentStatus } from './status';
 import { loadOrGenerateCert, writeTrustReadme } from './tls-cert';
+import { startAutoUpdateLoop } from './update';
+import { buildDriverHost } from './drivers/host';
+import type { Capability } from './protocol';
 
 const ROTATE_INTERVAL_MS = 1000 * 60 * 45;
 
@@ -37,15 +35,11 @@ export async function runAgent(): Promise<void> {
     };
   };
 
-  const handler = (cap: Capability): CommandHandler | null => {
-    const c = loadConfig();
-    if (cap === 'printer.escpos' && c.printer) return handlePrint;
-    if (cap === 'printer.label' && c.printer) return handleLabel;
-    if (cap === 'drawer.kick' && c.printer) return handleDrawer;
-    if (cap === 'scanner.barcode' || cap === 'scanner.qr') return handleScan;
-    if (cap === 'signature.esign') return handleEsign;
-    return null;
-  };
+  // Command routing is delegated to the DriverHost registry (Open/Closed):
+  // the status server asks host.handlerFor(cap); each registered driver owns
+  // its own handler. New hardware = register a driver, no router edits.
+  const host = buildDriverHost();
+  const handler = (cap: Capability) => host.handlerFor(cap);
 
   // Loopback server must start before web auth (browser POSTs token here).
   let tlsCfg: { cert: string; key: string } | null = null;
@@ -105,110 +99,12 @@ export async function runAgent(): Promise<void> {
 
   startAutoUpdateLoop(current);
   startHeartbeatLoop(current);
+  // Polling fallback (roadmap §21): when the panel WS is disconnected, drain
+  // hardware jobs the cloud queued for this agent. Also enforces immediate
+  // revocation (§27) — a panel-side revoke wipes the local session within the
+  // poll interval, not the 3-minute heartbeat tick.
+  startPollFallback(host, { isPanelConnected: () => isPanelWsConnected() });
 
   await new Promise(() => {});
 }
 
-interface PrintPayload {
-  header?: string;
-  lines?: { text: string; bold?: boolean; align?: 'left' | 'center' | 'right'; size?: 'normal' | 'double' }[];
-  footer?: string;
-  cut?: boolean;
-}
-
-const handlePrint: CommandHandler = async (cmd: CommandMessage) => {
-  const action = String(cmd.action || 'print');
-  if (action === 'status' || action === 'health') {
-    return handleHealth(cmd);
-  }
-  if (action !== 'print') {
-    return { error: customerError('unsupported_action', `printer.escpos.${action}`) };
-  }
-  const cfg = loadConfig();
-  if (!cfg.printer) return { error: customerError('not_configured') };
-  const p = (cmd.payload ?? {}) as PrintPayload;
-  const r = await spooledPrint(cfg.printer, {
-    header: p.header,
-    lines: p.lines ?? [],
-    footer: p.footer,
-    cut: p.cut,
-    codePage: cfg.printer.codePage,
-  });
-  if (!r.ok) {
-    const code = r.deadLettered ? 'printer_dead_letter' : 'printer_busy';
-    return { error: customerError(code, r.error) };
-  }
-  return { payload: { bytes: r.bytes } };
-};
-
-const handleLabel: CommandHandler = async (cmd: CommandMessage) => {
-  const action = String(cmd.action || 'print');
-  if (action !== 'print' && action !== 'label') {
-    return { error: customerError('unsupported_action', `printer.label.${action}`) };
-  }
-  const cfg = loadConfig();
-  if (!cfg.printer) return { error: customerError('not_configured') };
-  const p = (cmd.payload ?? {}) as {
-    text?: string;
-    dialect?: 'zpl' | 'epl' | 'tspl';
-    spec?: import('./label.js').LabelSpec;
-  };
-  // If the panel sends a structured LabelSpec, render to the requested dialect
-  // (roadmap §11). Otherwise fall back to a simple ESC/POS bold line so a
-  // plain text label still prints on a thermal printer.
-  if (p.spec) {
-    const dialect = p.dialect ?? 'zpl';
-    const { renderLabel } = await import('./label');
-    const { spooledRaw } = await import('./spool');
-    const bytes = renderLabel(p.spec, dialect);
-    const r = await spooledRaw(cfg.printer, bytes);
-    if (!r.ok) return { error: customerError(r.deadLettered ? 'printer_dead_letter' : 'device_error', r.error) };
-    return { payload: { bytes: r.bytes, dialect } };
-  }
-  const r = await spooledPrint(cfg.printer, { lines: [{ text: p.text ?? '', bold: true }] });
-  if (!r.ok) return { error: customerError(r.deadLettered ? 'printer_dead_letter' : 'device_error', r.error) };
-  return { payload: { bytes: r.bytes } };
-};
-
-const handleDrawer: CommandHandler = async (cmd: CommandMessage) => {
-  const action = String(cmd.action || 'kick');
-  if (action !== 'kick') {
-    return { error: customerError('unsupported_action', `drawer.kick.${action}`) };
-  }
-  const cfg = loadConfig();
-  if (!cfg.printer) return { error: customerError('not_configured') };
-  const r = await spooledDrawerKick(cfg.printer, 1, 50, 50);
-  if (!r.ok) return { error: customerError('device_error', r.error) };
-  return { payload: { kicked: true, bytes: r.bytes } };
-};
-
-const handleScan: CommandHandler = async (cmd: CommandMessage) => {
-  const action = String(cmd.action || 'scan');
-  if (action !== 'scan' && action !== 'capture') {
-    return { error: customerError('unsupported_action', `scanner.${action}`) };
-  }
-  const p = (cmd.payload ?? {}) as { code?: string };
-  if (!p.code) return { error: customerError('scanner_empty') };
-  const parsed = parseBarcode(p.code);
-  return { payload: { code: parsed.code, symbology: parsed.symbology, gs1: parsed.gs1, fields: parsed.fields, capturedAt: new Date().toISOString() } };
-};
-
-const handleHealth: CommandHandler = async (cmd: CommandMessage) => {
-  const action = String(cmd.action || 'status');
-  if (action !== 'status') {
-    return { error: customerError('unsupported_action', `printer.escpos.${action}`) };
-  }
-  const cfg = loadConfig();
-  if (!cfg.printer) return { error: customerError('not_configured') };
-  // Real status probing would send encodeHealthRequest bytes and read the
-  // response; here we expose the encoder + decoder contract so the panel can
-  // request a health snapshot. A full round-trip requires a duplex socket.
-  void cmd;
-  const h: PrinterHealth = aggregateHealth({});
-  const errKey = healthErrorKey(h);
-  return { payload: { health: h, probe: Array.from(encodeHealthRequest('paper')), error: errKey } };
-};
-
-const handleEsign: CommandHandler = async () => {
-  return { error: customerError('unsupported_action', 'Nitelikli e-imza yakında.') };
-};

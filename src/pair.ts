@@ -6,6 +6,7 @@
 import type { ConnectorConfig } from './config';
 import type { Capability, AgentInfo } from './protocol';
 import { CONNECTOR_VERSION } from './version';
+import { buildDriverHost } from './drivers/host';
 
 interface PairResponse {
   success?: boolean;
@@ -62,10 +63,10 @@ export function agentInfo(): AgentInfo {
   return { name: 'ankara-connector', version: CONNECTOR_VERSION, os };
 }
 
-export function advertisedCapabilities(cfg: ConnectorConfig): Capability[] {
-  const caps: Capability[] = ['scanner.barcode', 'scanner.qr'];
-  if (cfg.printer) {
-    caps.push('printer.escpos', 'printer.label', 'drawer.kick');
-  }
-  return caps;
+export function advertisedCapabilities(_cfg: ConnectorConfig): Capability[] {
+  // Delegate to the DriverHost registry so adding a driver automatically
+  // advertises its capability (Open/Closed). The host is built fresh per call
+  // so newly configured hardware (e.g. a printer set via /config/printer) is
+  // reflected without an agent restart.
+  return buildDriverHost().advertisedCapabilities();
 }

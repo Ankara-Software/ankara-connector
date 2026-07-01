@@ -27,6 +27,15 @@ export interface ConnectorConfig {
   tls?: boolean;
   /** Verified update staged for next restart. */
   pendingUpdate?: import('./update.js').PendingUpdate | null;
+  // Phase 1 hardware devices
+  barrier?: BarrierConfig | null;
+  rfid?: RfidConfig | null;
+  camera?: CameraConfig | null;
+  signage?: SignageConfig | null;
+  display?: DisplayConfig | null;
+  wiegand?: WiegandConfig | null;
+  biometric?: BiometricConfig | null;
+  esign?: EsignConfig | null;
 }
 
 export interface PrinterConfig {
@@ -36,7 +45,73 @@ export interface PrinterConfig {
   codePage?: number;
 }
 
+/** Modbus barrier/relay device (roadmap §14). */
+export interface BarrierConfig {
+  host: string;
+  port: number;
+  /** Modbus slave unit id. */
+  unit: number;
+  /** Coil address that opens/closes the barrier. */
+  coil: number;
+}
+
+/** UHF RFID reader (LLRP, roadmap §15). */
+export interface RfidConfig {
+  host: string;
+  port: number;
+}
+
+/** ALPR / IP camera (RTSP + edge OCR, roadmap §13/28). */
+export interface CameraConfig {
+  /** rtsp://user:pass@host:port/path */
+  rtspUrl: string;
+  /** Optional ONVIF device service URL for discovery/capabilities. */
+  onvifUrl?: string;
+}
+
+/** LED signage / tabela (roadmap signage.led). */
+export interface SignageConfig {
+  kind: 'tcp' | 'serial';
+  /** host:port for tcp, COMx for serial. */
+  endpoint: string;
+  screen: number;
+}
+
+/** Customer-facing pole display (roadmap display.pole). */
+export interface DisplayConfig {
+  kind: 'serial' | 'tcp';
+  endpoint: string;
+}
+
+/** Wiegand gate reader (roadmap rfid.gate). */
+export interface WiegandConfig {
+  /** USB-HID vid:pid of the Wiegand converter. */
+  vidPid: string;
+}
+
+/** Biometric reader (roadmap §17). */
+export interface BiometricConfig {
+  /** 'mock' | 'zkteco' | 'suprema' — vendor plugin id. */
+  plugin: string;
+  /** Path to the vendor native SDK library (.node/.dll/.so). */
+  libPath?: string;
+}
+
+/** PKCS#11 / NES e-imza (roadmap §16). */
+export interface EsignConfig {
+  /** Path to the PKCS#11 shared library (SoftHSM2 or vendor token). */
+  pkcs11Lib: string;
+}
+
 const DEFAULT_API = 'https://api.ankarayazilim.org/v1';
+
+/** Test-only config override (set then cleared by tests; null in production). */
+let testConfigOverride: ConnectorConfig | null = null;
+
+/** Test helper: override loadConfig() without touching the real config file. */
+export function setConfigOverride(cfg: ConnectorConfig | null): void {
+  testConfigOverride = cfg;
+}
 
 export function configPath(): string {
   return join(homedir(), '.ankara-connector', 'config.json');
@@ -56,6 +131,7 @@ export function defaultConfig(): ConnectorConfig {
 }
 
 export function loadConfig(): ConnectorConfig {
+  if (testConfigOverride) return testConfigOverride;
   const fs = require('node:fs');
   let text = '';
   try {

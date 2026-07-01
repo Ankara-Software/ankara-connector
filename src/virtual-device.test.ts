@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
-import { createVirtualDeviceState, handleVirtualCommand, runVirtualWire, virtualHello } from './virtual-device';
 import { encode, makeAck, type CommandMessage } from './protocol';
+import { createVirtualDeviceState, handleVirtualCommand, runVirtualWire, virtualHello } from './virtual-device';
 
 function cmd(cap: CommandMessage['cap'], action: string, payload?: unknown, id = 'c1'): CommandMessage {
   return { kind: 'command', v: 1, id, cap, action, ...(payload !== undefined ? { payload } : {}) };

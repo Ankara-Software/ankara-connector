@@ -44,6 +44,11 @@ export type CommandHandler = (
 /** Connected panel WebSocket clients — receive unsolicited hardware events. */
 const wsClients = new Set<{ send: (data: string) => void }>();
 
+/** True when at least one panel WS client is currently connected. */
+export function isPanelWsConnected(): boolean {
+  return wsClients.size > 0;
+}
+
 export function broadcastConnectorEvent(cap: Capability, event: string, payload?: unknown): void {
   const msg = makeEvent(cap, event, payload);
   const wire = encode(msg);

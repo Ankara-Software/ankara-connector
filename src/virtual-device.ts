@@ -5,12 +5,11 @@
 // conformance tests, panel smoke checks, and CI without real hardware.
 // Reuses the real protocol + handlers so behavior matches production.
 
-import { encodeJob, encodeDrawerKick } from './escpos';
 import { parseBarcode } from './barcode';
+import { encodeDrawerKick, encodeJob } from './escpos';
 import { aggregateHealth, type PrinterHealth } from './printer-health';
-import { PROTOCOL_VERSION } from './protocol';
-import type { AgentInfo, Capability, CommandMessage, AckMessage, HelloMessage } from './protocol';
-import { decode, makeAck, makeAckError, encode, makeEvent } from './protocol';
+import type { AckMessage, AgentInfo, Capability, CommandMessage, HelloMessage } from './protocol';
+import { decode, encode, makeAck, makeAckError, makeEvent, PROTOCOL_VERSION } from './protocol';
 
 const VIRTUAL_CAPABILITIES: Capability[] = [
   'printer.escpos',

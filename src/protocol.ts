@@ -99,7 +99,8 @@ function isObject(x: unknown): x is Record<string, unknown> {
 function isNonEmptyString(x: unknown): x is string {
   return typeof x === 'string' && x.length > 0;
 }
-function isCapability(x: unknown): x is Capability {
+/** Runtime guard: true when `x` is a known capability id. */
+export function isCapability(x: unknown): x is Capability {
   return typeof x === 'string' && (CAPABILITIES as readonly string[]).includes(x);
 }
 

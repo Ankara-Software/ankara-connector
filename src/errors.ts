@@ -32,6 +32,22 @@ export const ERROR_ENCYCLOPEDIA: Readonly<Record<string, ErrorEntry>> = {
   printer_dead_letter: { code: 'E08', title: 'Baskı başarısız', hint: 'Yazıcı art arda yanıt vermedi. Komut iptal edildi.' },
   scanner_empty: { code: 'E11', title: 'Tarama verisi boş', hint: 'Barkod okuyucu veri göndermedi. Tekrar deneyin.' },
   not_configured: { code: 'E12', title: 'Cihaz yapılandırılmamış', hint: 'Bu donanımı panelden tanımlayın.' },
+
+  // Transport / native-addon (roadmap §7-8, enterprise §2)
+  driver_module_missing: { code: 'E13', title: 'Sürücü modülü yok', hint: 'Bu cihaz için yerel sürücü kurulu değil. Ankara Yazılım destekinden sürücüyü isteyin.' },
+  transport_offline: { code: 'E14', title: 'Bağlantı kurulamadı', hint: 'Cihaza ulaşılamıyor. Kabloyu, IP adresini ve gücü kontrol edin.' },
+  serial_error: { code: 'E15', title: 'Seri port hatası', hint: 'COM portu kullanılamıyor. Başka uygulama açık değilse tekrar deneyin.' },
+  usb_error: { code: 'E16', title: 'USB hatası', hint: 'USB cihazı tanınmadı. Kabloyu değiştirin veya portu değiştirin.' },
+
+  // Hardware protocol modules (roadmap §12-17)
+  barrier_error: { code: 'E21', title: 'Bariyer hatası', hint: 'Röle/Modbus cihazı yanıt vermedi. Ağ ve kablo bağlantısını kontrol edin.' },
+  rfid_error: { code: 'E22', title: 'RFIF okuyucu hatası', hint: 'LLRP okuyucu yanıt vermedi. IP ve antena gücünü kontrol edin.' },
+  camera_error: { code: 'E23', title: 'Kamera hatası', hint: 'RTSP/ONVIF akışı alınamadı. Kamera IP ve kimlik bilgilerini kontrol edin.' },
+  ocr_error: { code: 'E24', title: 'Plaka tanınamadı', hint: 'Görüntü çok karanlık veya bulanık. Kamera açısını düzeltin.' },
+  esign_error: { code: 'E25', title: 'E-imza hatası', hint: 'Akıllı kart/takılı değil veya PIN hatalı. Tokenı takıp tekrar deneyin.' },
+  biometric_error: { code: 'E26', title: 'Biyometrik hatası', hint: 'Parmak izi okuyucu yanıt vermedi. Sensörü temizleyin ve tekrar deneyin.' },
+  signage_error: { code: 'E27', title: 'Tabela hatası', hint: 'LED tabela yanıt vermedi. Bağlantı ve ekran kimliğini kontrol edin.' },
+  display_error: { code: 'E28', title: 'Müşteri ekranı hatası', hint: 'Pole display yanıt vermedi. Seri/USB bağlantısını kontrol edin.' },
 };
 
 /** Map a raw protocol/device error code to a customer-facing ErrorEntry. */
