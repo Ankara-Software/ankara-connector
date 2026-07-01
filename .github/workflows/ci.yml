@@ -31,7 +31,7 @@ jobs:
       - name: Install deps
         run: bun install --frozen-lockfile
       - name: Typecheck
-        run: bunx tsc --noEmit
+        run: bun run typecheck
       - name: Run unit tests
         run: bun test
       - name: Build compiled binary (OS-compat smoke, roadmap §43)
