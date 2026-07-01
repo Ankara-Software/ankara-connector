@@ -87,6 +87,10 @@ export class OfflineBuffer {
 
   /** Delete fully-synced events older than `keepMs`. */
   pruneSynced(keepMs = 1000 * 60 * 60 * 24): number {
+    if (keepMs <= 0) {
+      const r = this.db.run('DELETE FROM events WHERE synced_at IS NOT NULL');
+      return Number(r.changes);
+    }
     const cutoff = new Date(Date.now() - keepMs).toISOString();
     const r = this.db.run('DELETE FROM events WHERE synced_at IS NOT NULL AND synced_at < ?', [cutoff]);
     return Number(r.changes);

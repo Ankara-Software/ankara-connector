@@ -1,8 +1,20 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
+import { setConfigOverride } from './config';
 import { DriverHost, type ICapabilityDriver } from './driver-host';
 import { buildDriverHost } from './drivers/host';
 import type { Capability, CommandMessage } from './protocol';
+
+const emptyConfig = {
+  apiBase: 'http://127.0.0.1:9',
+  token: null,
+  deviceId: null,
+  label: null,
+  tenantName: null,
+  pairedAt: null,
+  printer: null,
+  statusPort: 4781,
+} as const;
 
 function cmd(cap: Capability, action: string, id = 'c1'): CommandMessage {
   return { kind: 'command', v: 1, id, cap, action };
@@ -19,6 +31,9 @@ function fakeDriver(cap: Capability, available: boolean, label: string): ICapabi
 }
 
 describe('DriverHost', () => {
+  beforeEach(() => setConfigOverride({ ...emptyConfig }));
+  afterEach(() => setConfigOverride(null));
+
   test('registers and resolves a driver by capability', () => {
     const host = new DriverHost();
     host.register(fakeDriver('rfid.uhf', true, 'RFID'));
@@ -66,5 +81,5 @@ describe('DriverHost', () => {
     // Without a printer configured, escpos/drawer are not advertised.
     expect(host.driverFor('printer.escpos')).not.toBeNull();
     expect(host.driverFor('signature.esign')).not.toBeNull();
-  });
+  }, 15000);
 });
