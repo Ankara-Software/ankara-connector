@@ -38,7 +38,8 @@ export function encodeWriteMultipleCoils(
   const byteCount = Math.ceil(values.length / 8);
   const coilBytes = new Uint8Array(byteCount);
   values.forEach((v, i) => {
-    if (v) coilBytes[Math.floor(i / 8)] |= 1 << (i % 8);
+    const idx = Math.floor(i / 8);
+    coilBytes[idx] = (coilBytes[idx] ?? 0) | (v ? 1 << (i % 8) : 0);
   });
   const pdu = new Uint8Array(6 + byteCount);
   pdu[0] = 0x0f;
@@ -72,8 +73,8 @@ export function decodeModbusFrame(buf: Uint8Array): ModbusFrame | null {
   if (buf.byteLength < 8) return null;
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const transaction = view.getUint16(0);
-  const unit = buf[6];
-  const fn = buf[7] as ModbusFunction;
+  const unit = buf[6] ?? 0;
+  const fn = (buf[7] ?? 0) as ModbusFunction;
   const data = buf.slice(8);
   return { transaction, unit, function: fn, data };
 }

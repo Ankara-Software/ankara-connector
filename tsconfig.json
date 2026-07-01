@@ -10,7 +10,8 @@
     "skipLibCheck": true,
     "allowJs": false,
     "noEmit": true,
-    "lib": ["ESNext"]
+    "lib": ["ESNext", "DOM"]
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "types/**/*.d.ts"],
+  "exclude": ["**/*.test.ts"]
 }

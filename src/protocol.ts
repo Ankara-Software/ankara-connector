@@ -141,7 +141,7 @@ export function parseMessage(raw: unknown): ParseResult<ConnectorMessage> {
     case 'ack':
     case 'event':
       // Accepted but not acted upon from the panel side.
-      return { ok: true, value: raw as ConnectorMessage };
+      return { ok: true, value: raw as unknown as ConnectorMessage };
     default:
       return { ok: false, error: { code: 'bad_message', message: `unknown kind: ${String(raw['kind'])}` } };
   }

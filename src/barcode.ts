@@ -134,7 +134,7 @@ export function parseBarcode(input: string | Uint8Array): ParsedBarcode {
   const hadFnc1 = trimmed[0] === GS;
   // Replace remaining GS separators with a visible group separator for GS1.
   const visible = trimmed.map((b) => (b === GS || b === RS ? 0x1f : b));
-  let text = new TextDecoder('utf8').decode(new Uint8Array(visible));
+  let text = new TextDecoder('utf-8').decode(new Uint8Array(visible));
   text = stripAimPrefix(text);
   const cleanText = text.replace(/\x1f/g, String.fromCharCode(GS));
 

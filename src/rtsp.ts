@@ -37,7 +37,7 @@ export function buildRtspRequest(
 export function parseRtspStatus(line: string): { version: string; status: number; reason: string } | null {
   const m = line.match(/^(RTSP\/[\d.]+)\s+(\d{3})\s+(.*)$/);
   if (!m) return null;
-  return { version: m[1], status: Number(m[2]), reason: m[3] };
+  return { version: m[1]!, status: Number(m[2]), reason: m[3]! };
 }
 
 /** Parse SDP body into track list (a=control attributes). */

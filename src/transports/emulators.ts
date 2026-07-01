@@ -115,7 +115,7 @@ export function modbusBarrierResponder(): EmulatorResponder {
     }
     if (fn === 0x01) {
       // read coils: respond with 1 byte = 0x01 (coil on)
-      return new Uint8Array([data[0], fn, 0x02, 0x01, 0x01, 0x00, 0x00]);
+      return new Uint8Array([data[0] ?? 0, fn, 0x02, 0x01, 0x01, 0x00, 0x00]);
     }
     return null;
   };

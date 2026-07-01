@@ -170,7 +170,7 @@ export function startStatusServer(
           .catch(() => {});
       },
       async message(ws, msg) {
-        const text = typeof msg === 'string' ? msg : new TextDecoder().decode(msg as ArrayBuffer);
+        const text = typeof msg === 'string' ? msg : new TextDecoder().decode(msg as unknown as ArrayBuffer);
         const parsed = decode(text);
         if (!parsed.ok) {
           ws.send(encode(makeAckError('bad-json', parsed.error.code, parsed.error.message)));

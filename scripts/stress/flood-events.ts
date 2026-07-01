@@ -12,7 +12,6 @@
 // for a hardware-free stress target.
 
 import { argv, exit } from 'node:process';
-import { WebSocket } from 'node:websocket';
 
 interface Args {
   url: string;
@@ -27,11 +26,11 @@ function parseArgs(): Args {
   for (let i = 0; i < argv.length; i += 1) {
     const k = argv[i];
     const v = argv[i + 1];
-    if (k === '--url') { a.url = v ?? a.url; i += 1; }
-    else if (k === '--rate') { a.rate = Number(v ?? a.rate); i += 1; }
-    else if (k === '--duration-sec') { a.durationSec = Number(v ?? a.durationSec); i += 1; }
-    else if (k === '--cap') { a.cap = v ?? a.cap; i += 1; }
-    else if (k === '--p99') { a.targetP99Ms = Number(v ?? a.targetP99Ms); i += 1; }
+    if (k === '--url' && v) { a.url = v; i += 1; }
+    else if (k === '--rate' && v) { a.rate = Number(v); i += 1; }
+    else if (k === '--duration-sec' && v) { a.durationSec = Number(v); i += 1; }
+    else if (k === '--cap' && v) { a.cap = v; i += 1; }
+    else if (k === '--p99' && v) { a.targetP99Ms = Number(v); i += 1; }
   }
   return a;
 }
@@ -43,7 +42,7 @@ function encodeCommand(id: string, cap: string, action: string, payload: unknown
 function percentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
   const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length));
-  return sorted[idx];
+  return sorted[idx] ?? 0;
 }
 
 async function main(): Promise<void> {
@@ -53,7 +52,7 @@ async function main(): Promise<void> {
   const ws = new WebSocket(args.url);
   await new Promise<void>((resolve, reject) => {
     ws.onopen = () => resolve();
-    ws.onerror = (e) => reject(new Error(`connect failed: ${(e as Error).message ?? 'unknown'}`));
+    ws.onerror = () => reject(new Error('connect failed'));
     setTimeout(() => reject(new Error('connect timeout')), 5000);
   });
 
@@ -63,9 +62,10 @@ async function main(): Promise<void> {
   let errors = 0;
   const pending = new Map<string, number>();
 
-  ws.onmessage = (ev) => {
+  ws.onmessage = (ev: MessageEvent) => {
     try {
-      const msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '');
+      const raw = typeof ev.data === 'string' ? ev.data : '';
+      const msg = JSON.parse(raw) as { kind?: string; id?: string; error?: unknown };
       if (msg.kind === 'ack' && msg.id) {
         const t0 = pending.get(msg.id);
         if (t0 != null) {
@@ -80,7 +80,6 @@ async function main(): Promise<void> {
     }
   };
 
-  const intervalMs = Math.max(1, 1000 / args.rate);
   const start = Date.now();
   const end = start + args.durationSec * 1000;
   const sender = setInterval(() => {
