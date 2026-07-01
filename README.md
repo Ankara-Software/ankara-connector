@@ -39,9 +39,29 @@ ankara-connector              Başlat (varsayılan)
 ankara-connector logout       Yerel oturumu sıfırla
 ankara-connector status       Yapılandırmayı göster
 ankara-connector version      Sürümü göster
+ankara-connector install-daemon [--silent]   Arka plan hizmeti olarak kur
+ankara-connector uninstall-daemon            Arka plan hizmetini kaldır
+ankara-connector watchdog      Agent’ı denetle, çökünce yeniden başlat
+ankara-connector trust-cert    Yerel TLS sertifikası üret + güven rehberi
+ankara-connector update-check  Doğrulanmış güncelleme kontrolü
 ```
 
-Yapılandırma: `~/.ankara-connector/config.json` (yerel, 0600).
+Yapılandırma: `~/.ankara-connector/config.json` (yerel, 0600). Cihaz belirteci
+OS anahtarlığında (macOS Keychain / Windows Credential Manager / dosya) saklanır.
+
+## Operatör-bağımlı (blocked) yetenekler
+
+Aşağıdaki yeteneklerin agent tarafı sözleşmeleri + mock sağlayıcıları hazırdır;
+gerçek donanım/SDK operatör unblock’unu bekler:
+
+- **Nitelikli e-imza (NES, PKCS#11)** — `src/esign.ts` (`EsignProvider`).
+  Akis/e-Tuğra PKCS#11 kütüphanesi + kart sağlanması gerekiyor.
+- **ÖKC / Ödeme cihazı** — `src/payment-device.ts` (`PaymentDeviceProvider`).
+  GİB onaylı vendor SDK + banka kimlik bilgileri gerekiyor.
+- **Biyometrik (parmak izi/iris)** — `src/biometric.ts` (`BiometricProvider`).
+  ZKTeco/Suprema SDK lisansı gerekiyor.
+- **EV code signing + MSI/PKG/deb + Android/iOS store** — p298-connector-code-signing
+  ve p298-connector-mobile ile operatör takip ediliyor.
 
 ## Geliştirme
 
