@@ -148,7 +148,23 @@ const handleLabel: CommandHandler = async (cmd: CommandMessage) => {
   }
   const cfg = loadConfig();
   if (!cfg.printer) return { error: customerError('not_configured') };
-  const p = (cmd.payload ?? {}) as { text?: string };
+  const p = (cmd.payload ?? {}) as {
+    text?: string;
+    dialect?: 'zpl' | 'epl' | 'tspl';
+    spec?: import('./label.js').LabelSpec;
+  };
+  // If the panel sends a structured LabelSpec, render to the requested dialect
+  // (roadmap §11). Otherwise fall back to a simple ESC/POS bold line so a
+  // plain text label still prints on a thermal printer.
+  if (p.spec) {
+    const dialect = p.dialect ?? 'zpl';
+    const { renderLabel } = await import('./label');
+    const { spooledRaw } = await import('./spool');
+    const bytes = renderLabel(p.spec, dialect);
+    const r = await spooledRaw(cfg.printer, bytes);
+    if (!r.ok) return { error: customerError(r.deadLettered ? 'printer_dead_letter' : 'device_error', r.error) };
+    return { payload: { bytes: r.bytes, dialect } };
+  }
   const r = await spooledPrint(cfg.printer, { lines: [{ text: p.text ?? '', bold: true }] });
   if (!r.ok) return { error: customerError(r.deadLettered ? 'printer_dead_letter' : 'device_error', r.error) };
   return { payload: { bytes: r.bytes } };
