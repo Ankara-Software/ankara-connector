@@ -11,13 +11,21 @@ import { decode, makeAck, makeAckError, encode, PROTOCOL_VERSION, makeEvent } fr
 import { deliverAuthCallback, type AuthCallbackPayload } from './auth-flow';
 import { loadConfig, saveConfig, type PrinterConfig } from './config';
 
-/** Origins allowed to POST device tokens to the localhost callback (web auth page). */
-const AUTH_CALLBACK_ORIGINS = new Set([
+/** Origins allowed to talk to the loopback API (roadmap §24, enterprise §1).
+ *  Only the production panel + local dev servers may issue commands; a random
+ *  website on the user's machine must never reach the printer or barrier. */
+const ALLOWED_ORIGINS = new Set([
   'https://ankarayazilim.org',
   'https://www.ankarayazilim.org',
+  'https://panel.ankarayazilim.org',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
 ]);
+
+/** Origins allowed to POST device tokens to the localhost callback (web auth page). */
+const AUTH_CALLBACK_ORIGINS = ALLOWED_ORIGINS;
 
 export interface AgentStatus {
   paired: boolean;
@@ -92,10 +100,21 @@ export function startStatusServer(
   handler: (cap: Capability) => CommandHandler | null,
   agent: () => AgentInfo,
 ): void {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+  const corsHeadersFor = (origin: string | null): Record<string, string> => {
+    if (origin && ALLOWED_ORIGINS.has(origin)) {
+      return {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        Vary: 'Origin',
+      };
+    }
+    // No reflected origin for disallowed callers; still answer preflight minimally.
+    return {
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      Vary: 'Origin',
+    };
   };
 
   function authCorsHeaders(origin: string | null): Record<string, string> {
@@ -107,7 +126,7 @@ export function startStatusServer(
         Vary: 'Origin',
       };
     }
-    return corsHeaders;
+    return corsHeadersFor(origin);
   }
 
   Bun.serve({
@@ -158,6 +177,7 @@ export function startStatusServer(
     fetch(req, server) {
       const url = new URL(req.url);
       const origin = req.headers.get('origin');
+      const corsHeaders = corsHeadersFor(origin);
 
       if (url.pathname === '/auth/callback') {
         const acHeaders = authCorsHeaders(origin);

@@ -6,10 +6,13 @@
 import { loadConfig, saveConfig } from './config';
 import { agentInfo, advertisedCapabilities, rotateToken } from './pair';
 import { startStatusServer, type AgentStatus, type CommandHandler } from './status';
-import { printJob, sendRawBytes } from './printer';
-import { encodeDrawerKick } from './escpos';
+import { spooledPrint, spooledDrawerKick } from './spool';
+import { parseBarcode } from './barcode';
+import { customerError } from './errors';
+import { healthErrorKey, encodeHealthRequest, aggregateHealth, type PrinterHealth } from './printer-health';
 import { waitForWebAuth, cancelAllPendingAuth } from './auth-flow';
 import { startAutoUpdateLoop } from './update';
+import { startHeartbeatLoop } from './heartbeat';
 import type { Capability, CommandMessage } from './protocol';
 
 const ROTATE_INTERVAL_MS = 1000 * 60 * 45;
@@ -89,6 +92,7 @@ export async function runAgent(): Promise<void> {
   );
 
   startAutoUpdateLoop(current);
+  startHeartbeatLoop(current);
 
   await new Promise(() => {});
 }
@@ -102,58 +106,81 @@ interface PrintPayload {
 
 const handlePrint: CommandHandler = async (cmd: CommandMessage) => {
   const action = String(cmd.action || 'print');
+  if (action === 'status' || action === 'health') {
+    return handleHealth(cmd);
+  }
   if (action !== 'print') {
-    return { error: { code: 'unsupported_action', message: `printer.escpos.${action} desteklenmiyor.` } };
+    return { error: customerError('unsupported_action', `printer.escpos.${action}`) };
   }
   const cfg = loadConfig();
-  if (!cfg.printer) return { error: { code: 'device_error', message: 'Yazıcı yapılandırılmamış. Panelden tanımlayın.' } };
+  if (!cfg.printer) return { error: customerError('not_configured') };
   const p = (cmd.payload ?? {}) as PrintPayload;
-  const r = await printJob(cfg.printer, {
+  const r = await spooledPrint(cfg.printer, {
     header: p.header,
     lines: p.lines ?? [],
     footer: p.footer,
     cut: p.cut,
     codePage: cfg.printer.codePage,
   });
-  if (!r.ok) return { error: { code: 'device_error', message: r.error || 'Yazdırma başarısız' } };
+  if (!r.ok) {
+    const code = r.deadLettered ? 'printer_dead_letter' : 'printer_busy';
+    return { error: customerError(code, r.error) };
+  }
   return { payload: { bytes: r.bytes } };
 };
 
 const handleLabel: CommandHandler = async (cmd: CommandMessage) => {
   const action = String(cmd.action || 'print');
   if (action !== 'print' && action !== 'label') {
-    return { error: { code: 'unsupported_action', message: `printer.label.${action} desteklenmiyor.` } };
+    return { error: customerError('unsupported_action', `printer.label.${action}`) };
   }
   const cfg = loadConfig();
-  if (!cfg.printer) return { error: { code: 'device_error', message: 'Yazıcı yapılandırılmamış. Panelden tanımlayın.' } };
+  if (!cfg.printer) return { error: customerError('not_configured') };
   const p = (cmd.payload ?? {}) as { text?: string };
-  const r = await printJob(cfg.printer, { lines: [{ text: p.text ?? '', bold: true }] });
-  if (!r.ok) return { error: { code: 'device_error', message: r.error || 'Etiket yazdırma başarısız' } };
+  const r = await spooledPrint(cfg.printer, { lines: [{ text: p.text ?? '', bold: true }] });
+  if (!r.ok) return { error: customerError(r.deadLettered ? 'printer_dead_letter' : 'device_error', r.error) };
   return { payload: { bytes: r.bytes } };
 };
 
 const handleDrawer: CommandHandler = async (cmd: CommandMessage) => {
   const action = String(cmd.action || 'kick');
   if (action !== 'kick') {
-    return { error: { code: 'unsupported_action', message: `drawer.kick.${action} desteklenmiyor.` } };
+    return { error: customerError('unsupported_action', `drawer.kick.${action}`) };
   }
   const cfg = loadConfig();
-  if (!cfg.printer) return { error: { code: 'device_error', message: 'Yazıcı yapılandırılmamış. Panelden tanımlayın.' } };
-  const r = await sendRawBytes(cfg.printer, encodeDrawerKick(1, 50, 50));
-  if (!r.ok) return { error: { code: 'device_error', message: r.error || 'Para çekmecesi açılamadı' } };
+  if (!cfg.printer) return { error: customerError('not_configured') };
+  const r = await spooledDrawerKick(cfg.printer, 1, 50, 50);
+  if (!r.ok) return { error: customerError('device_error', r.error) };
   return { payload: { kicked: true, bytes: r.bytes } };
 };
 
 const handleScan: CommandHandler = async (cmd: CommandMessage) => {
   const action = String(cmd.action || 'scan');
   if (action !== 'scan' && action !== 'capture') {
-    return { error: { code: 'unsupported_action', message: `scanner.${action} desteklenmiyor.` } };
+    return { error: customerError('unsupported_action', `scanner.${action}`) };
   }
   const p = (cmd.payload ?? {}) as { code?: string };
-  if (!p.code) return { error: { code: 'bad_message', message: 'Tarama verisi (code) gerekli.' } };
-  return { payload: { code: p.code, capturedAt: new Date().toISOString() } };
+  if (!p.code) return { error: customerError('scanner_empty') };
+  const parsed = parseBarcode(p.code);
+  return { payload: { code: parsed.code, symbology: parsed.symbology, gs1: parsed.gs1, fields: parsed.fields, capturedAt: new Date().toISOString() } };
+};
+
+const handleHealth: CommandHandler = async (cmd: CommandMessage) => {
+  const action = String(cmd.action || 'status');
+  if (action !== 'status') {
+    return { error: customerError('unsupported_action', `printer.escpos.${action}`) };
+  }
+  const cfg = loadConfig();
+  if (!cfg.printer) return { error: customerError('not_configured') };
+  // Real status probing would send encodeHealthRequest bytes and read the
+  // response; here we expose the encoder + decoder contract so the panel can
+  // request a health snapshot. A full round-trip requires a duplex socket.
+  void cmd;
+  const h: PrinterHealth = aggregateHealth({});
+  const errKey = healthErrorKey(h);
+  return { payload: { health: h, probe: Array.from(encodeHealthRequest('paper')), error: errKey } };
 };
 
 const handleEsign: CommandHandler = async () => {
-  return { error: { code: 'unsupported_action', message: 'Nitelikli e-imza yakında.' } };
+  return { error: customerError('unsupported_action', 'Nitelikli e-imza yakında.') };
 };

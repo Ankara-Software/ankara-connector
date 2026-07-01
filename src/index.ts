@@ -51,6 +51,22 @@ async function main(): Promise<void> {
       await runAgent();
       return;
 
+    case 'install-daemon':
+    case 'uninstall-daemon': {
+      const { spawn } = await import('node:child_process');
+      const isWin = process.platform === 'win32';
+      const script = isWin
+        ? require('node:path').join(process.cwd(), 'scripts', 'install-daemon-windows.ps1')
+        : require('node:path').join(process.cwd(), 'scripts', 'install-daemon.sh');
+      const action = cmd === 'install-daemon' ? 'install' : 'uninstall';
+      if (isWin) {
+        spawn('pwsh', ['-File', script, '-Action', action], { stdio: 'inherit' });
+      } else {
+        spawn('/bin/sh', [script, cmd], { stdio: 'inherit' });
+      }
+      return;
+    }
+
     case 'update-check': {
       const cfg = loadConfig();
       const pending = await stageUpdateIfAvailable(cfg);
@@ -69,6 +85,8 @@ Kullanım:
   ankara-connector status       Yerel yapılandırmayı göster
   ankara-connector version      Sürümü göster
   ankara-connector update-check Güncelleme kontrolü (doğrulanmış indirme)
+  ankara-connector install-daemon   Arka plan hizmeti olarak kur (açılışta başlasın)
+  ankara-connector uninstall-daemon Arka plan hizmetini kaldır
 
 Oturum kalıcıdır — bir kez giriş yaptıktan sonra kim olduğunuzu ve hangi
 firmaya bağlı olduğunuzu hatırlar. Tüm cihaz ayarları web panelden yapılır.
