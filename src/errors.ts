@@ -48,6 +48,9 @@ export const ERROR_ENCYCLOPEDIA: Readonly<Record<string, ErrorEntry>> = {
   biometric_error: { code: 'E26', title: 'Biyometrik hatası', hint: 'Parmak izi okuyucu yanıt vermedi. Sensörü temizleyin ve tekrar deneyin.' },
   signage_error: { code: 'E27', title: 'Tabela hatası', hint: 'LED tabela yanıt vermedi. Bağlantı ve ekran kimliğini kontrol edin.' },
   display_error: { code: 'E28', title: 'Müşteri ekranı hatası', hint: 'Pole display yanıt vermedi. Seri/USB bağlantısını kontrol edin.' },
+  wiegand_error: { code: 'E29', title: 'Kapı RFID hatası', hint: 'Wiegand okuyucu/çevirici yanıt vermedi. USB-HID çeviriciyi kontrol edin.' },
+  discovery_error: { code: 'E31', title: 'Cihaz keşfi başarısız', hint: 'Ağda cihaz bulunamadı. Aynı ağda olduğundan emin olun; mDNS/ONVIF için güvenlik duvarını kontrol edin.' },
+  offline_buffer_error: { code: 'E32', title: 'Yerel arabellek hatası', hint: 'Olaylar geçici olarak kaydedilemedi. Disk dolu değilse tekrar denenecek.' },
 };
 
 /** Map a raw protocol/device error code to a customer-facing ErrorEntry. */
