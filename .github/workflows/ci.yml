@@ -34,3 +34,9 @@ jobs:
         run: bunx tsc --noEmit
       - name: Run unit tests
         run: bun test
+      - name: Build compiled binary (OS-compat smoke, roadmap §43)
+        run: bun build src/index.ts --compile --minify --outfile dist/ankara-connector-smoke
+      - name: Smoke test --version + selftest on ${{ matrix.os }}
+        run: |
+          ./dist/ankara-connector-smoke --version
+          ./dist/ankara-connector-smoke selftest
