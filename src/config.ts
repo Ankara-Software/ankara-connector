@@ -22,8 +22,10 @@ export interface ConnectorConfig {
   pairedAt: string | null;
   printer: PrinterConfig | null;
   statusPort: number;
-  /** Serve the loopback bridge over HTTPS/WSS (roadmap §24). Default off to
-   *  preserve the working ws:// flow until the panel trusts the localhost cert. */
+  /** Serve the loopback bridge over HTTPS/WSS (roadmap §24, enterprise §1).
+   *  Default-on: the HTTPS panel cannot speak plain ws:// to a loopback endpoint
+   *  without mixed-content errors. Set `tls: false` to opt out (e.g. for a
+   *  dev panel served over http://). */
   tls?: boolean;
   /** Verified update staged for next restart. */
   pendingUpdate?: import('./update.js').PendingUpdate | null;

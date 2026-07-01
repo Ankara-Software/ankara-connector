@@ -28,7 +28,12 @@ function isWindows(): boolean {
   return process.platform === 'win32';
 }
 
-/** Save a secret to the OS keychain, or fall back to a 0600 file. */
+/** Save a secret to the OS keychain, or fall back to a 0600 file.
+ *
+ *  Windows: the token is DPAPI-encrypted (current-user scope) and stored in a
+ *  file — Credential Manager's `cmdkey` can save a credential but cannot
+ *  reliably reload the password from a non-interactive process, so we use DPAPI
+ *  which round-trips correctly (roadmap §25 Windows gap fix). */
 export function saveSecret(value: string): void {
   if (isDarwin()) {
     try {
@@ -45,12 +50,8 @@ export function saveSecret(value: string): void {
     }
   }
   if (isWindows()) {
-    try {
-      execFileSync('cmdkey', [`/generic:${SERVICE}:${ACCOUNT}`, `/user:${ACCOUNT}`, `/pass:${value}`], { stdio: 'ignore' });
-      return;
-    } catch {
-      // fall through to file fallback
-    }
+    if (dpapiSave(value)) return;
+    // fall through to file fallback if DPAPI unavailable
   }
   // Linux libsecret is async-via-DBus and not safe to shell out to here;
   // use the encrypted-at-rest 0600 file fallback.
@@ -71,8 +72,10 @@ export function loadSecret(): string | null {
     }
   }
   if (isWindows()) {
-    // cmdkey list does not return the password; we rely on the file fallback
-    // for retrieval on Windows. Saving still uses Credential Manager.
+    // DPAPI-backed file round-trips reliably (roadmap §25 Windows gap fix).
+    const dpapiValue = dpapiLoad();
+    if (dpapiValue) return dpapiValue;
+    // fall through to plaintext file for one migration cycle
   }
   return readSecretFile();
 }
@@ -103,6 +106,53 @@ export function clearSecret(): void {
   }
 }
 
+/** DPAPI-encrypt `value` (current-user scope) and write it to the token file.
+ *  Returns true on success. Falls back to false when PowerShell/DPAPI missing. */
+function dpapiSave(value: string): boolean {
+  if (!isWindows()) return false;
+  try {
+    // PowerShell DPAPI: ConvertTo-SecureString | ConvertFrom-SecureString emits
+    // a DPAPI-encrypted blob readable only by the same Windows user account.
+    const ps = `$s = ConvertTo-SecureString -String ([Environment]::GetEnvironmentVariable('VAL','Process')) -AsPlainText -Force; ConvertFrom-SecureString -SecureString $s`;
+    const out = execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+      stdio: ['pipe', 'pipe', 'ignore'],
+      input: value,
+      env: { ...process.env, VAL: value },
+    });
+    const blob = out.toString('utf8').trim();
+    if (!blob) return false;
+    writeSecretFile(blob);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Read the DPAPI-encrypted blob from the token file and decrypt it. */
+function dpapiLoad(): string | null {
+  if (!isWindows()) return null;
+  const p = tokenFilePath();
+  if (!existsSync(p)) return null;
+  const blob = readFileSync(p, 'utf8').trim();
+  if (!blob) return null;
+  // Detect legacy plaintext tokens (not DPAPI blobs): DPAPI blobs are long hex
+  // strings starting with 01000000. If it doesn't look like a blob, treat as
+  // legacy plaintext and let the caller migrate.
+  if (!/^01000000[0-9a-f]+$/.test(blob)) return null;
+  try {
+    const ps = `$s = ConvertTo-SecureString -String ([Environment]::GetEnvironmentVariable('BLOB','Process')); [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))`;
+    const out = execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+      stdio: ['pipe', 'pipe', 'ignore'],
+      input: blob,
+      env: { ...process.env, BLOB: blob },
+    });
+    const v = out.toString('utf8').trim();
+    return v.length ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 function writeSecretFile(value: string): void {
   const p = tokenFilePath();
   mkdirSync(dirname(p), { recursive: true });
@@ -127,9 +177,9 @@ export function secretFilePath(): string {
 }
 
 /** Test-only: detect which backend would be used on this platform. */
-export function secretBackend(): 'keychain' | 'credential-manager' | 'file' {
+export function secretBackend(): 'keychain' | 'dpapi' | 'file' {
   if (isDarwin()) return 'keychain';
-  if (isWindows()) return 'credential-manager';
+  if (isWindows()) return 'dpapi';
   return 'file';
 }
 

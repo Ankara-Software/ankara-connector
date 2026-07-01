@@ -4,7 +4,7 @@ import { secretBackend, secretFilePath } from './secret-store';
 
 describe('secret-store', () => {
   test('secretBackend returns one of the documented backends', () => {
-    expect(['keychain', 'credential-manager', 'file']).toContain(secretBackend());
+    expect(['keychain', 'dpapi', 'file']).toContain(secretBackend());
   });
 
   test('secretFilePath lives under ~/.ankara-connector', () => {

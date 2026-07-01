@@ -83,15 +83,20 @@ async function main(): Promise<void> {
     }
 
     case 'trust-cert': {
-      const { loadOrGenerateCert, writeTrustReadme } = await import('./tls-cert');
+      const { loadOrGenerateCert, writeTrustReadme, installCertToTrustStore } = await import('./tls-cert');
       const cert = loadOrGenerateCert();
       if (!cert) {
         console.error('Sertifika üretilemedi (openssl kurulu mu?).');
         process.exit(3);
       }
       writeTrustReadme();
+      const installed = installCertToTrustStore(cert.certPath);
       console.log(`Yerel sertifika: ${cert.certPath}`);
-      console.log('Tarayıcı güveni için README.txt içindeki adımları izleyin.');
+      if (installed) {
+        console.log('Sertifika işletim sistemi güven deposuna eklendi. Tarayıcı uyarısı olmaksızın wss:// kullanılabilir.');
+      } else {
+        console.log('Otomatik güven eklenemedi (yönetici izni gerekebilir). README.txt içindeki adımları izleyin.');
+      }
       return;
     }
 
