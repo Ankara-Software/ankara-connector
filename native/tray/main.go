@@ -26,7 +26,7 @@ import (
 var iconData []byte
 
 const (
-	version    = "1.1.1"
+	version    = "1.1.2"
 	statusPort = 4781
 	statusURL  = "http://127.0.0.1:4781/"
 )
