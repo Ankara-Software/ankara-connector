@@ -8,7 +8,8 @@
 
 param(
   [ValidateSet('install', 'uninstall')] [string]$Action = 'install',
-  [string]$BinPath = (Join-Path $env:LOCALAPPDATA 'AnkaraYazilim\ankara-connector.exe')
+  [string]$BinPath = (Join-Path $env:LOCALAPPDATA 'AnkaraYazilim\ankara-connector.exe'),
+  [switch]$Silent
 )
 
 $ErrorActionPreference = 'Stop'

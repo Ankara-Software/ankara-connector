@@ -10,6 +10,7 @@
 //   ankara-connector logout
 //   ankara-connector version
 
+import { spawn } from 'node:child_process';
 import { runAgent } from './agent';
 import { defaultConfig, loadConfig, saveConfig } from './config';
 import { stageUpdateIfAvailable, tryApplyStoredUpdate } from './update';
@@ -53,17 +54,24 @@ async function main(): Promise<void> {
 
     case 'install-daemon':
     case 'uninstall-daemon': {
-      const { spawn } = await import('node:child_process');
+      const silent = process.argv.includes('--silent') || process.argv.includes('/S');
       const isWin = process.platform === 'win32';
       const script = isWin
         ? require('node:path').join(process.cwd(), 'scripts', 'install-daemon-windows.ps1')
         : require('node:path').join(process.cwd(), 'scripts', 'install-daemon.sh');
       const action = cmd === 'install-daemon' ? 'install' : 'uninstall';
+      const extraArgs = silent ? ['-Silent'] : [];
       if (isWin) {
-        spawn('pwsh', ['-File', script, '-Action', action], { stdio: 'inherit' });
+        spawn('pwsh', ['-File', script, '-Action', action, ...extraArgs], { stdio: 'inherit' });
       } else {
-        spawn('/bin/sh', [script, cmd], { stdio: 'inherit' });
+        spawn('/bin/sh', [script, cmd], { stdio: silent ? 'ignore' : 'inherit' });
       }
+      return;
+    }
+
+    case 'watchdog': {
+      const { runWatchdog } = await import('./watchdog');
+      await runWatchdog({ argv: ['run'] });
       return;
     }
 
@@ -99,7 +107,9 @@ Kullanım:
   ankara-connector version      Sürümü göster
   ankara-connector update-check Güncelleme kontrolü (doğrulanmış indirme)
   ankara-connector install-daemon   Arka plan hizmeti olarak kur (açılışta başlasın)
+  ankara-connector install-daemon --silent  Sessiz kurulum (katılımsız dağıtım)
   ankara-connector uninstall-daemon Arka plan hizmetini kaldır
+  ankara-connector watchdog        Agent’ı denetle, çökünce yeniden başlat
 
 Oturum kalıcıdır — bir kez giriş yaptıktan sonra kim olduğunuzu ve hangi
 firmaya bağlı olduğunuzu hatırlar. Tüm cihaz ayarları web panelden yapılır.
