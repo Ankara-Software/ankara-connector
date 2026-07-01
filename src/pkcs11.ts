@@ -8,9 +8,9 @@
 // command payload and is used only for the duration of the sign call (KVKK item
 // 26: e-imza PIN never leaves the host).
 
-import { loadNativeModule } from './transports/native-loader';
 import type { EsignDocument, EsignProvider, EsignResult } from './esign';
 import { MockEsignProvider } from './esign';
+import { loadNativeModule } from './transports/native-loader';
 
 interface Pkcs11Api {
   default: {

@@ -8,10 +8,10 @@
 // UPOS-style action surface regardless of the underlying transport, with the
 // limitation documented plainly in the SDK docs (Phase 7).
 
-import { customerError } from '../errors';
 import type { ICapabilityDriver } from '../driver-host';
-import { buildDriverHost } from './host';
+import { customerError } from '../errors';
 import type { CommandMessage } from '../protocol';
+import { buildDriverHost } from './host';
 
 export const oposDriver: ICapabilityDriver = {
   id: 'opos-bridge',

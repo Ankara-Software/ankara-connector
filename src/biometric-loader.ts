@@ -12,10 +12,10 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { configPath } from './config';
-import { loadNativeModule } from './transports/native-loader';
 import type { BiometricProvider } from './biometric';
 import { MockBiometricProvider } from './biometric';
+import { configPath } from './config';
+import { loadNativeModule } from './transports/native-loader';
 
 export interface BiometricPluginManifest {
   id: string;

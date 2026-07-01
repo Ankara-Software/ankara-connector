@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 
-import { LoopbackTransport, StubTransport } from './mock';
-import { createTransport, createLoopbackPair } from './registry';
+import { StubTransport } from './mock';
+import { createLoopbackPair, createTransport } from './registry';
 import { SerialTransport } from './serial';
 import { TcpTransport } from './tcp';
+import { parseHostPort, parseVidPid } from './types';
 import { UdpTransport } from './udp';
 import { UsbHidTransport } from './usb-hid';
 import { UsbRawTransport } from './usb-raw';
-import { parseHostPort, parseVidPid } from './types';
 
 describe('transports / types', () => {
   test('parseHostPort parses host:port', () => {

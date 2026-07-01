@@ -9,8 +9,8 @@
 // reason as serial/HID.
 
 import { requireNativeModule } from './native-loader';
-import { parseVidPid } from './types';
 import type { Transport, TransportAddress, TransportHealth } from './types';
+import { parseVidPid } from './types';
 
 interface UsbApi {
   findByIds(vid: number, pid: number): UsbDevice | null;

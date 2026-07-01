@@ -9,15 +9,15 @@
 
 import { parseBarcode } from '../barcode';
 import { loadConfig } from '../config';
-import { customerError } from '../errors';
-import type { ICapabilityDriver, DeviceHealth } from '../driver-host';
-import { spooledDrawerKick, spooledPrint, spooledRaw } from '../spool';
-import type { CommandMessage } from '../protocol';
-import type { CommandHandler } from '../status';
-import { aggregateHealth, encodeHealthRequest, healthErrorKey, type PrinterHealth, type HealthProbeKind } from '../printer-health';
-import { renderLabel, type LabelSpec } from '../label';
-import { createTransport } from '../transports/registry';
 import { runOnDevice } from '../device-queue';
+import type { DeviceHealth, ICapabilityDriver } from '../driver-host';
+import { customerError } from '../errors';
+import { renderLabel, type LabelSpec } from '../label';
+import { aggregateHealth, encodeHealthRequest, healthErrorKey, type HealthProbeKind, type PrinterHealth } from '../printer-health';
+import type { CommandMessage } from '../protocol';
+import { spooledDrawerKick, spooledPrint, spooledRaw } from '../spool';
+import type { CommandHandler } from '../status';
+import { createTransport } from '../transports/registry';
 
 interface PrintPayload {
   header?: string;

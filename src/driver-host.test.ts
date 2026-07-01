@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 
 import { DriverHost, type ICapabilityDriver } from './driver-host';
-import type { Capability, CommandMessage } from './protocol';
 import { buildDriverHost } from './drivers/host';
+import type { Capability, CommandMessage } from './protocol';
 
 function cmd(cap: Capability, action: string, id = 'c1'): CommandMessage {
   return { kind: 'command', v: 1, id, cap, action };

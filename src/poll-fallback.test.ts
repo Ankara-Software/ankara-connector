@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 
+import { defaultConfig, setConfigOverride } from './config';
 import { DriverHost, type ICapabilityDriver } from './driver-host';
 import { dispatchPendingJob, fetchPendingJobs, RevokedError, type PollFallbackOptions } from './poll-fallback';
-import { setConfigOverride, defaultConfig } from './config';
 import type { CommandMessage } from './protocol';
 
 function cmd(cap: CommandMessage['cap'], action: string): CommandMessage {

@@ -5,16 +5,16 @@
 
 import { cancelAllPendingAuth, waitForWebAuth } from './auth-flow';
 import { loadConfig, saveConfig } from './config';
+import { installCrashHandlers } from './crash-report';
+import { buildDriverHost } from './drivers/host';
 import { startHeartbeatLoop } from './heartbeat';
+import { logLine } from './logger';
 import { advertisedCapabilities, agentInfo, rotateToken } from './pair';
 import { startPollFallback } from './poll-fallback';
-import { startStatusServer, isPanelWsConnected, type AgentStatus } from './status';
+import type { Capability } from './protocol';
+import { isPanelWsConnected, startStatusServer, type AgentStatus } from './status';
 import { loadOrGenerateCert, writeTrustReadme } from './tls-cert';
 import { startAutoUpdateLoop } from './update';
-import { buildDriverHost } from './drivers/host';
-import { installCrashHandlers } from './crash-report';
-import { logLine } from './logger';
-import type { Capability } from './protocol';
 
 const ROTATE_INTERVAL_MS = 1000 * 60 * 45;
 

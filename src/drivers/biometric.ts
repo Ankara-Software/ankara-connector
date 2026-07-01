@@ -3,11 +3,11 @@
 // | 'match' | 'enroll', userId?, template? }. Templates never leave the host;
 // only match results (userId + score) are returned (KVKK item 26).
 
-import { loadConfig } from '../config';
-import { customerError } from '../errors';
-import type { ICapabilityDriver } from '../driver-host';
-import { loadBiometricProvider } from '../biometric-loader';
 import type { BiometricTemplate } from '../biometric';
+import { loadBiometricProvider } from '../biometric-loader';
+import { loadConfig } from '../config';
+import type { ICapabilityDriver } from '../driver-host';
+import { customerError } from '../errors';
 import type { CommandMessage } from '../protocol';
 
 export const biometricDriver: ICapabilityDriver = {

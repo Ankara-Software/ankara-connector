@@ -6,8 +6,8 @@
 
 import { createSocket, type BindOptions, type Socket } from 'node:dgram';
 
-import { parseHostPort } from './types';
 import type { Transport, TransportAddress, TransportHealth } from './types';
+import { parseHostPort } from './types';
 
 export class UdpTransport implements Transport {
   private socket: Socket | null = null;

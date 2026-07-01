@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
-import { ERROR_ENCYCLOPEDIA, describeError, customerError } from './errors';
+import { ERROR_ENCYCLOPEDIA, customerError, describeError } from './errors';
 
 describe('error encyclopedia (Phase 7)', () => {
   it('covers every newly-wired module', () => {

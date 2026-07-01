@@ -6,14 +6,14 @@
 // known camera URL. Uses the existing onvif.ts SOAP builders + fetch for the
 // device service (no native addon).
 
-import { customerError } from '../errors';
 import type { ICapabilityDriver } from '../driver-host';
+import { customerError } from '../errors';
 import {
-  ONVIF_MULTICAST,
-  ONVIF_PORT,
-  buildDiscoveryProbe,
-  buildGetDeviceInformation,
-  parseProbeMatch,
+    ONVIF_MULTICAST,
+    ONVIF_PORT,
+    buildDiscoveryProbe,
+    buildGetDeviceInformation,
+    parseProbeMatch,
 } from '../onvif';
 import type { CommandMessage } from '../protocol';
 import { createTransport } from '../transports/registry';

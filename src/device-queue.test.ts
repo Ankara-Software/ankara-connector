@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
-import { runOnDevice, resetDeviceQueues, pendingDeviceKeys } from './device-queue';
+import { pendingDeviceKeys, resetDeviceQueues, runOnDevice } from './device-queue';
 
 describe('device-queue', () => {
   beforeEach(() => resetDeviceQueues());

@@ -4,8 +4,8 @@
 // only for the sign call — never stored, never logged (KVKK item 26).
 
 import { loadConfig } from '../config';
-import { customerError } from '../errors';
 import type { ICapabilityDriver } from '../driver-host';
+import { customerError } from '../errors';
 import { createEsignProvider } from '../pkcs11';
 import type { CommandMessage } from '../protocol';
 

@@ -10,14 +10,14 @@
 // as a real loopback WS server so the panel or QA tooling can send test
 // commands against a fake agent with zero hardware.
 
-import { createVirtualDeviceState, runVirtualWire, virtualHello } from './virtual-device';
-import { buildDriverHost } from './drivers/host';
-import { advertisedCapabilities, agentInfo } from './pair';
 import { loadConfig } from './config';
-import { createTransport } from './transports/registry';
 import { listLocalCrashes } from './crash-report';
+import { buildDriverHost } from './drivers/host';
 import { bufferedEventCount } from './event-bridge';
+import { advertisedCapabilities, agentInfo } from './pair';
 import { encode, type CommandMessage } from './protocol';
+import { createTransport } from './transports/registry';
+import { createVirtualDeviceState, runVirtualWire, virtualHello } from './virtual-device';
 
 export interface SelftestResult {
   ok: boolean;

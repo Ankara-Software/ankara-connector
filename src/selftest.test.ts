@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { runSelftest } from './selftest';
 import { setConfigOverride } from './config';
+import { runSelftest } from './selftest';
 
 describe('selftest', () => {
   beforeEach(() => {

@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
+import { bufferDeviceEvent, bufferedEventCount, pruneBufferedEvents, replayBufferedEvents, setOfflineBuffer } from './event-bridge';
 import { OfflineBuffer } from './offline-buffer';
-import { bufferDeviceEvent, replayBufferedEvents, bufferedEventCount, setOfflineBuffer, pruneBufferedEvents } from './event-bridge';
 
 describe('event-bridge', () => {
   let dir: string;

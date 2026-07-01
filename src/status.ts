@@ -8,10 +8,10 @@
 
 import { deliverAuthCallback, type AuthCallbackPayload } from './auth-flow';
 import { loadConfig, saveConfig, type PrinterConfig } from './config';
+import { bufferDeviceEvent, bufferedEventCount, replayBufferedEvents } from './event-bridge';
+import { logLine } from './logger';
 import type { AckMessage, AgentInfo, Capability, CommandMessage, HelloMessage } from './protocol';
 import { decode, encode, makeAck, makeAckError, makeEvent, PROTOCOL_VERSION } from './protocol';
-import { bufferDeviceEvent, replayBufferedEvents, bufferedEventCount } from './event-bridge';
-import { logLine } from './logger';
 
 /** Origins allowed to talk to the loopback API (roadmap §24, enterprise §1).
  *  Only the production panel + local dev servers may issue commands; a random

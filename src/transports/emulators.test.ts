@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
 import {
-  EmulatorTransport,
-  escposHealthResponder,
-  modbusBarrierResponder,
-  HidScannerEmulator,
+    EmulatorTransport,
+    escposHealthResponder,
+    HidScannerEmulator,
+    modbusBarrierResponder,
 } from './emulators';
-import { registerTransportFactory, clearTransportOverrides } from './registry';
+import { clearTransportOverrides, registerTransportFactory } from './registry';
 
 describe('hardware emulators (Phase 8)', () => {
   it('EmulatorTransport routes host writes through the responder', async () => {

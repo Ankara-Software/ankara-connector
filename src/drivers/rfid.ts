@@ -8,19 +8,19 @@
 // (KVKK item 26).
 
 import { loadConfig } from '../config';
-import { customerError } from '../errors';
-import type { ICapabilityDriver } from '../driver-host';
 import { TagDeduper } from '../dedup';
+import { runOnDevice } from '../device-queue';
+import type { ICapabilityDriver } from '../driver-host';
+import { customerError } from '../errors';
 import {
-  buildAddRospecBody,
-  decodeLlrpMessage,
-  encodeLlrpMessage,
-  parseTagReport,
+    buildAddRospecBody,
+    decodeLlrpMessage,
+    encodeLlrpMessage,
+    parseTagReport,
 } from '../llrp';
 import type { CommandMessage } from '../protocol';
-import { createTransport } from '../transports/registry';
-import { runOnDevice } from '../device-queue';
 import { throttlePoll } from '../throttle';
+import { createTransport } from '../transports/registry';
 
 let msgId = 1;
 

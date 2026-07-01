@@ -6,7 +6,7 @@
 // Run on Linux (or any host with dpkg-deb/fpm available).
 
 import { $ } from 'bun';
-import { existsSync, mkdirSync, rmSync, copyFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const VERSION = '1.1.1';

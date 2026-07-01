@@ -10,15 +10,15 @@
 // Reporting is OFF by default; it activates only when the user opts in via
 // `cfg.crashReporting === true` or the `CONNECTOR_CRASH_REPORTING=1` env var.
 
-import { appendFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 import { configPath, loadConfig } from './config';
-import { CONNECTOR_VERSION } from './version';
-import { agentInfo } from './pair';
 import { logLine } from './logger';
+import { agentInfo } from './pair';
+import { CONNECTOR_VERSION } from './version';
 
 export interface CrashDump {
   id: string;

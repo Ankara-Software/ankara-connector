@@ -8,8 +8,8 @@
 // the binary (e.g. in an OS-specific package).
 
 import { requireNativeModule } from './native-loader';
-import { SERIAL_DEFAULTS } from './types';
 import type { Transport, TransportAddress, TransportHealth } from './types';
+import { SERIAL_DEFAULTS } from './types';
 
 interface SerialPortApi {
   SerialPort: {

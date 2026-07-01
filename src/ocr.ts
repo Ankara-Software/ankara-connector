@@ -13,9 +13,9 @@ import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { loadNativeModule } from './transports/native-loader';
-import { buildCaptureArgs } from './rtsp';
 import { parseTurkishPlate } from './alpr';
+import { buildCaptureArgs } from './rtsp';
+import { loadNativeModule } from './transports/native-loader';
 
 export interface OcrResult {
   plates: { plate: string; valid: boolean; confidence: number }[];

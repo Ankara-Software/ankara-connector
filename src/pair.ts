@@ -4,9 +4,9 @@
 // Both return { success, data:{ deviceId, token } } on success.
 
 import type { ConnectorConfig } from './config';
-import type { Capability, AgentInfo } from './protocol';
-import { CONNECTOR_VERSION } from './version';
 import { buildDriverHost } from './drivers/host';
+import type { AgentInfo, Capability } from './protocol';
+import { CONNECTOR_VERSION } from './version';
 
 interface PairResponse {
   success?: boolean;

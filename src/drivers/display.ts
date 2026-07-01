@@ -3,8 +3,8 @@
 // two-line frame and sends it to the customer-facing LCD.
 
 import { loadConfig } from '../config';
-import { customerError } from '../errors';
 import type { ICapabilityDriver } from '../driver-host';
+import { customerError } from '../errors';
 import { poleFrame } from '../pole-display';
 import type { CommandMessage } from '../protocol';
 import { createTransport } from '../transports/registry';

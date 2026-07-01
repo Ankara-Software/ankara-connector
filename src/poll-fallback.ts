@@ -13,10 +13,10 @@
 // the poll interval (default 20s) instead of up to 3 minutes.
 
 import { defaultConfig, loadConfig, saveConfig, type ConnectorConfig } from './config';
+import type { DriverHost } from './driver-host';
 import { logLine } from './logger';
 import { advertisedCapabilities } from './pair';
-import type { CommandMessage, Capability } from './protocol';
-import type { DriverHost } from './driver-host';
+import type { Capability, CommandMessage } from './protocol';
 import { isCapability } from './protocol';
 
 const DEFAULT_POLL_INTERVAL_MS = 1000 * 20;

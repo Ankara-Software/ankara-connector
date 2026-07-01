@@ -11,10 +11,10 @@
 // only isolation degrades. The pool is opt-in per task; I/O-bound drivers keep
 // using the main loop.
 
-import { Worker } from 'node:worker_threads';
 import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Worker } from 'node:worker_threads';
 
 import { runOnDevice } from './device-queue';
 

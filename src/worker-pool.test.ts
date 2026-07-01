@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
-import { submitCompute, setWorkerSupported, inlineCompute } from './worker-pool';
 import { resetDeviceQueues } from './device-queue';
+import { inlineCompute, setWorkerSupported, submitCompute } from './worker-pool';
 
 describe('worker-pool', () => {
   beforeEach(() => {

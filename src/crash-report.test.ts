@@ -1,18 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import {
-  writeCrashDump,
-  crashReportingEnabled,
-  installCrashHandlers,
-  resetCrashHandlers,
-  listLocalCrashes,
-  sendCrashReport,
-  setCrashDirOverride,
-} from './crash-report';
 import { setConfigOverride } from './config';
+import {
+    crashReportingEnabled,
+    installCrashHandlers,
+    listLocalCrashes,
+    resetCrashHandlers,
+    sendCrashReport,
+    setCrashDirOverride,
+    writeCrashDump,
+} from './crash-report';
 
 let dir: string;
 

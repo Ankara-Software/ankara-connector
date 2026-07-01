@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { defaultConfig, setConfigOverride } from '../config';
+import { decodeModbusFrame } from '../modbus';
+import type { CommandMessage } from '../protocol';
+import { verifySignageFrame } from '../signage';
+import { LoopbackTransport } from '../transports/mock';
+import { clearTransportOverrides, registerTransportFactory } from '../transports/registry';
+import type { Transport, TransportAddress } from '../transports/types';
 import { barrierDriver } from './barrier';
-import { signageDriver } from './signage';
+import { biometricDriver } from './biometric';
 import { displayDriver } from './display';
 import { esignDriver } from './esign';
-import { biometricDriver } from './biometric';
-import { oposDriver } from './opos';
 import { buildDriverHost } from './host';
-import { clearTransportOverrides, registerTransportFactory } from '../transports/registry';
-import { LoopbackTransport } from '../transports/mock';
-import { decodeModbusFrame } from '../modbus';
-import { verifySignageFrame } from '../signage';
-import type { Transport, TransportAddress } from '../transports/types';
-import type { CommandMessage } from '../protocol';
+import { oposDriver } from './opos';
+import { signageDriver } from './signage';
 
 function cmd(cap: CommandMessage['cap'], action: string, payload?: unknown, id = 'c1'): CommandMessage {
   return { kind: 'command', v: 1, id, cap, action, ...(payload !== undefined ? { payload } : {}) };

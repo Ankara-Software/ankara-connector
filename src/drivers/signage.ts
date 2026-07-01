@@ -5,10 +5,10 @@
 // serial. Pure encoder reuse; the transport is chosen by config.
 
 import { loadConfig } from '../config';
-import { customerError } from '../errors';
 import type { ICapabilityDriver } from '../driver-host';
-import { encodeSignageFrame, type SignageFrame } from '../signage';
+import { customerError } from '../errors';
 import type { CommandMessage } from '../protocol';
+import { encodeSignageFrame, type SignageFrame } from '../signage';
 import { createTransport } from '../transports/registry';
 
 export const signageDriver: ICapabilityDriver = {

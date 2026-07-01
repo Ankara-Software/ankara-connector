@@ -14,7 +14,7 @@
 // Run on macOS (needs Xcode + pkgbuild/productbuild).
 
 import { $ } from 'bun';
-import { existsSync, mkdirSync, rmSync, copyFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 const VERSION = '1.1.1';

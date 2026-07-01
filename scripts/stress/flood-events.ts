@@ -11,8 +11,8 @@
 // or p99 latency exceeds the target. Run against `ankara-connector --virtual`
 // for a hardware-free stress target.
 
-import { WebSocket } from 'node:websocket';
 import { argv, exit } from 'node:process';
+import { WebSocket } from 'node:websocket';
 
 interface Args {
   url: string;

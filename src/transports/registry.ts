@@ -8,8 +8,8 @@
 import { LoopbackTransport, StubTransport } from './mock';
 import { SerialTransport } from './serial';
 import { TcpTransport } from './tcp';
-import { UdpTransport } from './udp';
 import type { Transport, TransportAddress, TransportFactory, TransportHealth } from './types';
+import { UdpTransport } from './udp';
 import { UsbHidTransport } from './usb-hid';
 import { UsbRawTransport } from './usb-raw';
 

@@ -7,8 +7,8 @@
 // error when the HID driver module is not installed.
 
 import { requireNativeModule } from './native-loader';
-import { parseVidPid } from './types';
 import type { Transport, TransportAddress, TransportHealth } from './types';
+import { parseVidPid } from './types';
 
 interface HidApi {
   HID: { new (vid: number, pid: number): HidDevice };

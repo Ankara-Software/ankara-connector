@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { throttlePoll, resetThrottle, sleep } from './throttle';
 import { setConfigOverride } from './config';
+import { resetThrottle, sleep, throttlePoll } from './throttle';
 
 describe('throttle', () => {
   beforeEach(() => {

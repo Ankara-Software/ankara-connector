@@ -11,8 +11,8 @@
 // by piggybacking buffered event ids onto the heartbeat; the server can fetch
 // them later. The local buffer is the source of truth until acked.
 
-import { OfflineBuffer, type BufferedEvent, type BufferedEventKind } from './offline-buffer';
 import { logLine } from './logger';
+import { OfflineBuffer, type BufferedEvent, type BufferedEventKind } from './offline-buffer';
 
 let buffer: OfflineBuffer | null = null;
 

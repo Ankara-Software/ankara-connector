@@ -5,11 +5,11 @@
 // unsolicited `rfid.gate` events (broadcastConnectorEvent) in a real deployment.
 
 import { loadConfig } from '../config';
-import { customerError } from '../errors';
 import type { ICapabilityDriver } from '../driver-host';
-import { decodeWiegand26, decodeWiegand34, wiegandPayload } from '../wiegand';
+import { customerError } from '../errors';
 import type { CommandMessage } from '../protocol';
 import { createTransport } from '../transports/registry';
+import { decodeWiegand26, decodeWiegand34, wiegandPayload } from '../wiegand';
 
 export const wiegandDriver: ICapabilityDriver = {
   id: 'wiegand-gate',

@@ -6,16 +6,16 @@
 // 26). Also exposes a 'discover' action that uses ONVIF WS-Discovery to find
 // cameras on the LAN (roadmap §20).
 
-import { loadConfig } from '../config';
-import { customerError } from '../errors';
-import type { ICapabilityDriver } from '../driver-host';
 import { PlateDeduper } from '../alpr';
+import { loadConfig } from '../config';
+import type { ICapabilityDriver } from '../driver-host';
+import { customerError } from '../errors';
 import { captureAndOcr } from '../ocr';
 import {
-  ONVIF_MULTICAST,
-  ONVIF_PORT,
-  buildDiscoveryProbe,
-  parseProbeMatch,
+    ONVIF_MULTICAST,
+    ONVIF_PORT,
+    buildDiscoveryProbe,
+    parseProbeMatch,
 } from '../onvif';
 import type { CommandMessage } from '../protocol';
 import { createTransport } from '../transports/registry';

@@ -7,16 +7,16 @@
 // customer-facing E21 barrier_error code.
 
 import { loadConfig } from '../config';
+import { runOnDevice } from '../device-queue';
+import type { DeviceHealth, ICapabilityDriver } from '../driver-host';
 import { customerError } from '../errors';
-import type { ICapabilityDriver, DeviceHealth } from '../driver-host';
 import {
-  barrierCommand,
-  decodeModbusFrame,
-  encodeReadCoils,
+    barrierCommand,
+    decodeModbusFrame,
+    encodeReadCoils,
 } from '../modbus';
 import type { CommandMessage } from '../protocol';
 import { createTransport } from '../transports/registry';
-import { runOnDevice } from '../device-queue';
 
 let txCounter = 1;
 

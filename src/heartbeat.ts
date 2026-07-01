@@ -7,10 +7,10 @@
 // lives in the fullstack server submodule (POST /v1/connector/heartbeat).
 
 import { defaultConfig, loadConfig, saveConfig } from './config';
-import { advertisedCapabilities, agentInfo } from './pair';
-import { CONNECTOR_VERSION } from './version';
 import { buildDriverHost } from './drivers/host';
 import { logLine } from './logger';
+import { advertisedCapabilities, agentInfo } from './pair';
+import { CONNECTOR_VERSION } from './version';
 
 const HEARTBEAT_INTERVAL_MS = 1000 * 60 * 3; // 3 minutes
 
