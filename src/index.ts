@@ -55,16 +55,23 @@ async function main(): Promise<void> {
     case 'install-daemon':
     case 'uninstall-daemon': {
       const silent = process.argv.includes('--silent') || process.argv.includes('/S');
+      const configIdx = process.argv.indexOf('--config');
+      const configFile = configIdx >= 0 ? process.argv[configIdx + 1] : undefined;
       const isWin = process.platform === 'win32';
       const script = isWin
         ? require('node:path').join(process.cwd(), 'scripts', 'install-daemon-windows.ps1')
         : require('node:path').join(process.cwd(), 'scripts', 'install-daemon.sh');
       const action = cmd === 'install-daemon' ? 'install' : 'uninstall';
-      const extraArgs = silent ? ['-Silent'] : [];
       if (isWin) {
-        spawn('pwsh', ['-File', script, '-Action', action, ...extraArgs], { stdio: 'inherit' });
+        const psArgs = ['-File', script, '-Action', action];
+        if (silent) psArgs.push('-Silent');
+        if (configFile) psArgs.push('-Config', configFile);
+        spawn('pwsh', psArgs, { stdio: 'inherit' });
       } else {
-        spawn('/bin/sh', [script, cmd], { stdio: silent ? 'ignore' : 'inherit' });
+        const shArgs: string[] = [cmd];
+        if (silent) shArgs.push('--silent');
+        if (configFile) shArgs.push('--config', configFile);
+        spawn('/bin/sh', [script, ...shArgs], { stdio: silent ? 'ignore' : 'inherit' });
       }
       return;
     }

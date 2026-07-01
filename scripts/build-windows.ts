@@ -96,6 +96,37 @@ if (existsSync(trayExe)) {
   await rcedit(join(DIST, LEGACY_OUT), versionInfo);
 }
 
+// Authenticode code signing (roadmap §49). Dev/self-signed by default; the
+// real EV cert drops in via env vars with no code change:
+//   CONNECTOR_AUTHENTICODE_PFX=<path-to-ev.pfx>
+//   CONNECTOR_AUTHENTICODE_PWD=<pfx-password>
+//   CONNECTOR_AUTHENTICODE_TS  =<rfc3161 timestamp url> (optional)
+async function signWindowsBinaries(): Promise<void> {
+  const pfx = process.env.CONNECTOR_AUTHENTICODE_PFX;
+  if (!pfx || !existsSync(pfx)) {
+    console.log('Authenticode: CONNECTOR_AUTHENTICODE_PFX not set — skipping signing (dev/self-signed build).');
+    return;
+  }
+  const pwd = process.env.CONNECTOR_AUTHENTICODE_PWD ?? '';
+  const ts = process.env.CONNECTOR_AUTHENTICODE_TS ?? 'http://timestamp.digicert.com';
+  if (!which('signtool')) {
+    console.warn('Authenticode: signtool not found on PATH — skipping signing.');
+    return;
+  }
+  for (const name of [CORE_OUT, TRAY_OUT, LEGACY_OUT]) {
+    const p = join(DIST, name);
+    if (!existsSync(p)) continue;
+    try {
+      await $`signtool sign /f ${pfx} /p ${pwd} /tr ${ts} /td sha256 /fd sha256 ${p}`.quiet();
+      console.log(`Authenticode signed: ${name}`);
+    } catch (e) {
+      console.warn(`Authenticode sign failed for ${name}:`, (e as Error).message);
+    }
+  }
+}
+
+await signWindowsBinaries();
+
 console.log('Windows build complete in dist/');
 
 function which(cmd: string): boolean {
