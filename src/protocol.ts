@@ -31,6 +31,7 @@ export interface AgentInfo {
   readonly name: string;
   readonly version: string;
   readonly os: 'windows' | 'macos' | 'linux' | 'android' | 'ios' | 'ipados';
+  readonly arch?: string;
 }
 
 export interface HelloMessage {

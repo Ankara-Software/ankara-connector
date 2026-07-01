@@ -12,11 +12,15 @@ import { startStatusServer, isPanelWsConnected, type AgentStatus } from './statu
 import { loadOrGenerateCert, writeTrustReadme } from './tls-cert';
 import { startAutoUpdateLoop } from './update';
 import { buildDriverHost } from './drivers/host';
+import { installCrashHandlers } from './crash-report';
+import { logLine } from './logger';
 import type { Capability } from './protocol';
 
 const ROTATE_INTERVAL_MS = 1000 * 60 * 45;
 
 export async function runAgent(): Promise<void> {
+  // Crash handlers first (roadmap §39): redacted local dump + opt-in cloud send.
+  installCrashHandlers();
   let cfg = loadConfig();
   const info = agentInfo();
   const startedAt = new Date().toISOString();
@@ -57,9 +61,9 @@ export async function runAgent(): Promise<void> {
       // wss:// with an untrusted cert; the panel can still pin it).
       const { installCertToTrustStore } = await import('./tls-cert');
       installCertToTrustStore(cert.certPath);
-      console.log('Loopback TLS etkin (wss://127.0.0.1:%d). Sertifika: %s', cfg.statusPort, cert.certPath);
+      logLine('info', `Loopback TLS etkin (wss://127.0.0.1:${cfg.statusPort}). Sertifika: ${cert.certPath}`);
     } else {
-      console.warn('TLS istendi ama sertifika üretilemedi (openssl yok?) — ws:// ile devam ediliyor.');
+      logLine('warn', 'TLS istendi ama sertifika üretilemedi (openssl yok?) — ws:// ile devam ediliyor.');
     }
   }
   startStatusServer(cfg.statusPort, status, handler, () => agentInfo(), tlsCfg);
@@ -76,11 +80,11 @@ export async function runAgent(): Promise<void> {
         pairedAt: new Date().toISOString(),
       };
       saveConfig(cfg);
-      console.log(`Oturum açıldı — cihaz ${auth.deviceId} firmaya bağlandı.`);
-      if (auth.tenantName) console.log(`Firma: ${auth.tenantName}`);
+      logLine('info', `Oturum açıldı — cihaz ${auth.deviceId} firmaya bağlandı.`);
+      if (auth.tenantName) logLine('info', `Firma: ${auth.tenantName}`);
     } catch (e) {
       cancelAllPendingAuth();
-      console.error((e as Error).message);
+      logLine('error', (e as Error).message);
       process.exit(2);
     }
   }
@@ -93,18 +97,15 @@ export async function runAgent(): Promise<void> {
     if (r.ok) {
       saveConfig({ ...c, token: r.token, deviceId: r.deviceId });
     } else {
-      console.error('Belirteç yenileme başarısız:', r.error);
+      logLine('error', `Belirteç yenileme başarısız: ${r.error}`);
     }
   }, ROTATE_INTERVAL_MS);
 
   const current = loadConfig();
   const caps = advertisedCapabilities(current);
-  console.log(`Ankara Yazılım Connector çalışıyor (${info.os}). Cihaz: ${current.deviceId}`);
-  console.log(`Yetenekler: ${caps.join(', ') || '—'}`);
-  console.log(
-    'Panelden komut bekleniyor (ws://127.0.0.1:%d). Oturum kalıcıdır — çıkmak için Ctrl+C.',
-    current.statusPort,
-  );
+  logLine('info', `Ankara Yazılım Connector çalışıyor (${info.os}). Cihaz: ${current.deviceId}`);
+  logLine('info', `Yetenekler: ${caps.join(', ') || '—'}`);
+  logLine('info', `Panelden komut bekleniyor (ws://127.0.0.1:${current.statusPort}). Oturum kalıcıdır — çıkmak için Ctrl+C.`);
 
   startAutoUpdateLoop(current);
   startHeartbeatLoop(current);

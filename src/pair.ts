@@ -60,7 +60,7 @@ export function agentInfo(): AgentInfo {
     : platform.startsWith('darwin')
       ? 'macos'
       : 'linux';
-  return { name: 'ankara-connector', version: CONNECTOR_VERSION, os };
+  return { name: 'ankara-connector', version: CONNECTOR_VERSION, os, arch: process.arch };
 }
 
 export function advertisedCapabilities(_cfg: ConnectorConfig): Capability[] {

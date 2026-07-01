@@ -8,7 +8,7 @@
 
 import { loadConfig } from '../config';
 import { customerError } from '../errors';
-import type { ICapabilityDriver } from '../driver-host';
+import type { ICapabilityDriver, DeviceHealth } from '../driver-host';
 import {
   barrierCommand,
   decodeModbusFrame,
@@ -32,6 +32,22 @@ export const barrierDriver: ICapabilityDriver = {
   isAvailable: () => !!loadConfig().barrier,
   handle: async (cmd: CommandMessage) =>
     runOnDevice(deviceKey(), () => runBarrier(cmd)),
+  health: async (): Promise<DeviceHealth[]> => {
+    const cfg = loadConfig().barrier;
+    if (!cfg) return [];
+    const online = await runOnDevice(deviceKey(), async () => {
+      const t = createTransport({ kind: 'tcp', endpoint: `${cfg.host}:${cfg.port}` });
+      const ok = await t.open();
+      await t.close();
+      return ok;
+    });
+    return [{
+      online,
+      error: !online,
+      label: online ? 'Bariyer çevrimiçi' : 'Bariyer çevrimdışı',
+      detail: { host: cfg.host, port: cfg.port, unit: cfg.unit, coil: cfg.coil },
+    }];
+  },
 };
 
 async function runBarrier(cmd: CommandMessage) {

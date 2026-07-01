@@ -41,6 +41,9 @@ export interface ConnectorConfig {
   /** Minimum milliseconds between polling iterations for a single device
    *  (roadmap §35 CPU throttling). 0 disables throttling. */
   pollMinIntervalMs?: number;
+  /** Opt-in cloud crash reporting (roadmap §39). Default off; only metadata
+   *  (version, OS, stack hash) is ever sent — never device/business data. */
+  crashReporting?: boolean;
 }
 
 export interface PrinterConfig {

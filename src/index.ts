@@ -100,6 +100,25 @@ async function main(): Promise<void> {
       return;
     }
 
+    case 'selftest': {
+      const { runSelftest } = await import('./selftest');
+      const result = await runSelftest();
+      for (const c of result.checks) {
+        console.log(`${c.ok ? 'OK ' : 'FAIL'}  ${c.name}${c.detail ? ` — ${c.detail}` : ''}`);
+      }
+      console.log(result.ok ? 'selftest: GEÇTİ' : 'selftest: BAŞARISIZ');
+      process.exit(result.ok ? 0 : 1);
+    }
+
+    case '--virtual':
+    case 'virtual': {
+      const { startVirtualServer } = await import('./selftest');
+      const port = Number(process.argv[3] ?? 4782);
+      startVirtualServer(port);
+      await new Promise(() => {});
+      return;
+    }
+
     case 'help':
     case '-h':
     case '--help':
@@ -115,6 +134,8 @@ Kullanım:
   ankara-connector install-daemon --silent  Sessiz kurulum (katılımsız dağıtım)
   ankara-connector uninstall-daemon Arka plan hizmetini kaldır
   ankara-connector watchdog        Agent’ı denetle, çökünce yeniden başlat
+  ankara-connector selftest        Donanım olmadan iç test (destek/QA)
+  ankara-connector --virtual [port] Sanal cihaz sunucusu başlat (test)
 
 Oturum kalıcıdır — bir kez giriş yaptıktan sonra kim olduğunuzu ve hangi
 firmaya bağlı olduğunuzu hatırlar. Tüm cihaz ayarları web panelden yapılır.
