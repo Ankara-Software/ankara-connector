@@ -38,6 +38,9 @@ export interface ConnectorConfig {
   wiegand?: WiegandConfig | null;
   biometric?: BiometricConfig | null;
   esign?: EsignConfig | null;
+  /** Minimum milliseconds between polling iterations for a single device
+   *  (roadmap §35 CPU throttling). 0 disables throttling. */
+  pollMinIntervalMs?: number;
 }
 
 export interface PrinterConfig {
@@ -129,6 +132,7 @@ export function defaultConfig(): ConnectorConfig {
     pairedAt: null,
     printer: null,
     statusPort: 4781,
+    pollMinIntervalMs: 250,
   };
 }
 

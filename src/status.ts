@@ -10,6 +10,8 @@ import { deliverAuthCallback, type AuthCallbackPayload } from './auth-flow';
 import { loadConfig, saveConfig, type PrinterConfig } from './config';
 import type { AckMessage, AgentInfo, Capability, CommandMessage, HelloMessage } from './protocol';
 import { decode, encode, makeAck, makeAckError, makeEvent, PROTOCOL_VERSION } from './protocol';
+import { bufferDeviceEvent, replayBufferedEvents, bufferedEventCount } from './event-bridge';
+import { logLine } from './logger';
 
 /** Origins allowed to talk to the loopback API (roadmap §24, enterprise §1).
  *  Only the production panel + local dev servers may issue commands; a random
@@ -50,6 +52,15 @@ export function isPanelWsConnected(): boolean {
 }
 
 export function broadcastConnectorEvent(cap: Capability, event: string, payload?: unknown): void {
+  // Offline durability (roadmap §32): if no panel client is connected, buffer
+  // the event locally so it can be replayed on the next connect instead of
+  // being silently dropped.
+  if (wsClients.size === 0) {
+    const cfg = loadConfig();
+    const deviceId = cfg.deviceId ?? 'unpaired';
+    bufferDeviceEvent({ deviceId, cap: String(cap), event, payload });
+    return;
+  }
   const msg = makeEvent(cap, event, payload);
   const wire = encode(msg);
   for (const ws of wsClients) {
@@ -149,6 +160,14 @@ export function startStatusServer(
           capabilities: s.capabilities,
         };
         ws.send(encode(hello));
+        // Replay buffered events (roadmap §32) so a reconnecting panel does not
+        // lose device events that arrived while it was offline.
+        const deviceId = s.deviceId ?? 'unpaired';
+        void replayBufferedEvents(deviceId, (wire) => ws.send(wire), (cap, event, pl) => encode(makeEvent(cap as Capability, event, pl)))
+          .then((n) => {
+            if (n > 0) logLine('info', `status: ${n} arabellekli olay panele yeniden oynandı.`);
+          })
+          .catch(() => {});
       },
       async message(ws, msg) {
         const text = typeof msg === 'string' ? msg : new TextDecoder().decode(msg as ArrayBuffer);
@@ -232,7 +251,7 @@ export function startStatusServer(
         return new Response(null, { status: 204, headers: corsHeaders });
       }
       if (url.pathname === '/health') {
-        return Response.json({ ok: true, ...status() }, { headers: corsHeaders });
+        return Response.json({ ok: true, ...status(), bufferedEvents: bufferedEventCount() }, { headers: corsHeaders });
       }
       if (url.pathname === '/config/printer') {
         if (req.method === 'OPTIONS') {
