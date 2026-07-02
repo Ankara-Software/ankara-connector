@@ -18,6 +18,20 @@ pub struct PrinterConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingUpdate {
+    pub version: String,
+    pub path: String,
+    pub sha256: String,
+    pub filename: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EsignConfig {
+    #[serde(default)]
+    pub pkcs11_lib: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectorConfig {
     #[serde(default = "default_api_base")]
     pub api_base: String,
@@ -33,6 +47,10 @@ pub struct ConnectorConfig {
     pub paired_at: Option<String>,
     #[serde(default)]
     pub printer: Option<PrinterConfig>,
+    #[serde(default)]
+    pub pending_update: Option<PendingUpdate>,
+    #[serde(default)]
+    pub esign: Option<EsignConfig>,
     #[serde(default)]
     pub session_paused: bool,
 }
@@ -51,6 +69,8 @@ impl Default for ConnectorConfig {
             tenant_name: None,
             paired_at: None,
             printer: None,
+            pending_update: None,
+            esign: None,
             session_paused: false,
         }
     }

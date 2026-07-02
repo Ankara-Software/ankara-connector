@@ -6,11 +6,12 @@ members = [
   "crates/connector-cloud",
   "crates/connector-drivers",
   "crates/connector-tray",
+  "crates/connector-update",
   "crates/connector-app",
 ]
 
 [workspace.package]
-version = "2.0.1"
+version = "2.0.2"
 edition = "2021"
 license = "Proprietary"
 authors = ["Ankara Yazılım"]

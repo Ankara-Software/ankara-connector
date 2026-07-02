@@ -4,7 +4,7 @@
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
-!define APP_VERSION "2.0.0"
+!define APP_VERSION "2.0.2"
 !define APP_EXE "AnkaraConnector.exe"
 !define LEGACY_TRAY "AnkaraYazilimConnector.exe"
 !define LEGACY_CORE "ankara-connector-core.exe"

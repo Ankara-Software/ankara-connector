@@ -11,6 +11,7 @@ path = "src/main.rs"
 connector-config = { path = "../connector-config" }
 connector-cloud = { path = "../connector-cloud" }
 connector-tray = { path = "../connector-tray" }
+connector-update = { path = "../connector-update" }
 tokio = { workspace = true }
 log = { workspace = true }
 env_logger = "0.11"

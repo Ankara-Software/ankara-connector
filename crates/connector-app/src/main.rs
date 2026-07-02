@@ -5,7 +5,9 @@
 
 use anyhow::Result;
 use connector_cloud::{run_agent_loop, run_heartbeat_loop, start_login_flow};
+use connector_config::load_config;
 use connector_tray::{notify_login_result, run_tray, TrayActions};
+use connector_update::{start_auto_update_loop, try_apply_stored_update};
 use log::info;
 use tokio::sync::mpsc;
 
@@ -13,6 +15,11 @@ use tokio::sync::mpsc;
 async fn main() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     info!("Ankara Yazılım Connector v{}", connector_cloud::CONNECTOR_VERSION);
+
+    let _ = try_apply_stored_update().await;
+
+    let cfg = load_config();
+    start_auto_update_loop(cfg);
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
     let (login_tx, mut login_rx) = mpsc::unbounded_channel();

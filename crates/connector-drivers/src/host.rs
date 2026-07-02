@@ -1,13 +1,14 @@
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use connector_config::{ConnectorConfig, PrinterConfig};
+use connector_config::{load_config, save_config, ConnectorConfig, PrinterConfig};
 use connector_protocol::{ConnectorMessage, ProtocolError};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
 use crate::escpos::{encode_drawer_kick, encode_job, Align, PrintJob, PrintLine, Size};
+use crate::esign::list_esign_tokens;
 
 pub struct DriverHost;
 
@@ -17,6 +18,7 @@ pub fn advertised_capabilities(_cfg: &ConnectorConfig) -> Vec<String> {
         "scanner.barcode".into(),
         "scanner.qr".into(),
         "drawer.kick".into(),
+        "signature.esign".into(),
     ]
 }
 
@@ -90,6 +92,48 @@ pub async fn dispatch_command(
 ) -> Result<ConnectorMessage, ProtocolError> {
     let id = "unknown".to_string();
     match (cap, action) {
+        ("printer.escpos", "configure") => {
+            let obj = payload.as_ref().and_then(|v| v.as_object()).ok_or_else(|| ProtocolError {
+                code: "bad_message".into(),
+                message: "Yapılandırma verisi gerekli".into(),
+            })?;
+            let host = obj
+                .get("host")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| ProtocolError {
+                    code: "bad_message".into(),
+                    message: "Yazıcı host gerekli".into(),
+                })?;
+            let port = obj
+                .get("port")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(9100) as u16;
+            let mut disk = load_config();
+            disk.printer = Some(PrinterConfig {
+                host: host.to_string(),
+                port,
+                code_page: None,
+            });
+            save_config(&disk).map_err(|e| ProtocolError {
+                code: "device_error".into(),
+                message: e.to_string(),
+            })?;
+            Ok(ConnectorMessage::ack_ok(
+                &id,
+                Some(json!({ "configured": true, "printer": { "host": host, "port": port } })),
+            ))
+        }
+        ("printer.escpos", "health") => {
+            let printer = cfg.printer.as_ref().map(|p| json!({ "host": p.host, "port": p.port }));
+            Ok(ConnectorMessage::ack_ok(
+                &id,
+                Some(json!({
+                    "online": cfg.printer.is_some(),
+                    "printer": printer,
+                })),
+            ))
+        }
         ("printer.escpos", "print") => {
             let p = printer(cfg).map_err(|e| ProtocolError {
                 code: "device_error".into(),
@@ -126,6 +170,16 @@ pub async fn dispatch_command(
         ("scanner.barcode" | "scanner.qr", "inject") => {
             // Test/dev: payload { code: "..." } emits event upstream separately
             Ok(ConnectorMessage::ack_ok(&id, Some(payload.unwrap_or(Value::Null))))
+        }
+        ("signature.esign", "list" | "health") => {
+            let tokens = list_esign_tokens().map_err(|e| ProtocolError {
+                code: "device_error".into(),
+                message: e.to_string(),
+            })?;
+            Ok(ConnectorMessage::ack_ok(
+                &id,
+                Some(json!({ "tokens": tokens, "count": tokens.len() })),
+            ))
         }
         _ => Err(ProtocolError {
             code: "unsupported_action".into(),
