@@ -2,11 +2,9 @@
 // Windows also builds systray host + NSIS installer via scripts/build-windows.ts.
 
 import { $ } from 'bun';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 
 const ENTRY = 'src/index.ts';
-const VERSION = '1.1.4';
+const VERSION = '1.1.5';
 
 interface Target {
   id: string;

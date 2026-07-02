@@ -60,7 +60,7 @@ function squareTrayPng(source: Buffer, size = 256): Buffer {
   return PNG.sync.write(canvas);
 }
 
-/** NSIS MUI sidebar bitmap: 164×314, 24-bit BMP (no alpha). */
+/** NSIS MUI sidebar bitmap: 164×314, 24-bit BMP (bottom-up row order). */
 function installerSidebarBmp(source: Buffer): Buffer {
   const w = 164;
   const h = 314;
@@ -69,13 +69,14 @@ function installerSidebarBmp(source: Buffer): Buffer {
   const stride = rowBytes + pad;
   const pixels = Buffer.alloc(stride * h);
   const src = PNG.sync.read(source);
+  const rowOffset = (y: number) => (h - 1 - y) * stride;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const t = y / h;
       const r = Math.round(BRAND_NAVY.r * (1 - t * 0.35));
       const g = Math.round(BRAND_NAVY.g * (1 - t * 0.35));
       const b = Math.round(BRAND_NAVY.b * (1 - t * 0.35));
-      const o = y * stride + x * 3;
+      const o = rowOffset(y) + x * 3;
       pixels[o] = b;
       pixels[o + 1] = g;
       pixels[o + 2] = r;
@@ -96,7 +97,7 @@ function installerSidebarBmp(source: Buffer): Buffer {
       const px = ox + x;
       const py = oy + y;
       if (px < 0 || px >= w || py < 0 || py >= h) continue;
-      const o = py * stride + px * 3;
+      const o = rowOffset(py) + px * 3;
       const pb = pixels[o] ?? 0;
       const pg = pixels[o + 1] ?? 0;
       const pr = pixels[o + 2] ?? 0;
