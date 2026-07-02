@@ -1,0 +1,3 @@
+# s18 self-hosted runner: MSVC link.exe is not on PATH; use Scoop MinGW.
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"

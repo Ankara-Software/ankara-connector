@@ -8,12 +8,13 @@ const VERSION = '2.0.0';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const ICO = join(ROOT, 'windows', 'assets', 'ankara-yazilim.ico');
+const TARGET = process.env.CONNECTOR_RUST_TARGET || 'x86_64-pc-windows-gnu';
 
 mkdirSync(DIST, { recursive: true });
 
-console.log('Building Connector v2 (Rust)…');
-await $`cargo build --release -p connector-app`;
-const built = join(ROOT, 'target', 'release', 'AnkaraConnector.exe');
+console.log(`Building Connector v2 (Rust, ${TARGET})…`);
+await $`cargo build --release -p connector-app --target ${TARGET}`;
+const built = join(ROOT, 'target', TARGET, 'release', 'AnkaraConnector.exe');
 if (!existsSync(built)) {
   throw new Error('Rust build failed — AnkaraConnector.exe not found');
 }
