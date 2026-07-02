@@ -1,7 +1,5 @@
 //! Ankara Yazılım Connector v2 — single Rust binary, cloud relay.
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use connector_cloud::{run_agent_loop, run_heartbeat_loop, start_login_flow};
 use connector_tray::{notify_login_result, run_tray, TrayActions};
@@ -43,10 +41,8 @@ async fn main() -> Result<()> {
     });
 
     let actions = TrayActions { login_tx, logout_tx };
-    let tray_shutdown = Arc::new(shutdown_tx);
 
     std::thread::spawn(move || {
-        let _tray_shutdown = tray_shutdown;
         if let Err(e) = run_tray(actions) {
             log::error!("Tray hatası: {e}");
         }
