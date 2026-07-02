@@ -24,7 +24,7 @@ fn ws_url(cfg: &ConnectorConfig) -> Result<String> {
     Ok(format!("{base}/connector/agent?token={token}"))
 }
 
-pub async fn run_agent_loop(shutdown: tokio::sync::watch::Receiver<bool>) -> Result<()> {
+pub async fn run_agent_loop(mut shutdown: tokio::sync::watch::Receiver<bool>) -> Result<()> {
     loop {
         if *shutdown.borrow() {
             break;
