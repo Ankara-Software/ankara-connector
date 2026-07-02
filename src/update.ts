@@ -4,10 +4,10 @@
  * - Downloads only when sha256 is published
  * - Applies on next restart (never mid-command)
  */
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
 
 import type { ConnectorConfig } from './config';
 import { configPath, loadConfig, saveConfig } from './config';

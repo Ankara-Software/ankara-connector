@@ -24,7 +24,7 @@ import (
 var iconData []byte
 
 var (
-	version = "1.1.7"
+	version = "1.1.8"
 	build   = "dev"
 )
 
@@ -108,31 +108,26 @@ func onReady() {
 	mUpdate := systray.AddMenuItem("Güncellemeyi uygula…", "Bekleyen güncellemeyi kur")
 	mUpdate.Hide()
 	mAbout := systray.AddMenuItem("Hakkında…", "Sürüm bilgisi")
-	mPrivacy := systray.AddMenuItem("Gizlilik politikası…", "Web sitesinde aç")
-	mKvkk := systray.AddMenuItem("KVKK aydınlatma…", "Web sitesinde aç")
 	systray.AddSeparator()
 	mLogout := systray.AddMenuItem("Oturumu Kapat", "Yerel oturumu sıfırla")
+	mLogout.Hide()
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Çıkış", "Connector'ı kapat")
 
-	go pollHealth(mUpdate, mLogin, mLogout)
+	go pollHealth(mUpdate, mTrust, mLogin, mLogout)
 	go func() {
 		for {
 			select {
 			case <-mOpen.ClickedCh:
 				openBrowser(statusBaseURL())
 			case <-mTrust.ClickedCh:
-				openBrowser(statusPath("trust-cert"))
+				doTrustCert()
 			case <-mLogin.ClickedCh:
 				doLogin()
 			case <-mUpdate.ClickedCh:
 				doApplyUpdate()
 			case <-mAbout.ClickedCh:
 				showAbout()
-			case <-mPrivacy.ClickedCh:
-				openBrowser("https://ankarayazilim.org/gizlilik/")
-			case <-mKvkk.ClickedCh:
-				openBrowser("https://ankarayazilim.org/kvkk/")
 			case <-mLogout.ClickedCh:
 				doLogout()
 			case <-mQuit.ClickedCh:
@@ -246,14 +241,39 @@ func doLogout() {
 }
 
 func doLogin() {
-	_, status, err := postJSON("session/login")
+	out, status, err := postJSON("session/login")
 	if err != nil {
-		openBrowser(statusPath(""))
+		showAboutDialog("Connector çekirdeğine bağlanılamadı. Durum sayfasını kontrol edin.")
+		openBrowser(statusBaseURL())
 		return
 	}
 	if status >= 400 {
-		openBrowser(statusPath(""))
+		msg := "Oturum açılamadı."
+		if e, ok := out["error"].(string); ok && e != "" {
+			msg = e
+		}
+		showAboutDialog(msg)
+		return
 	}
+	showAboutDialog("Tarayıcıda oturum açma sayfası açıldı. Giriş yaptıktan sonra tray simgesi güncellenecek.")
+	updateTooltip()
+}
+
+func doTrustCert() {
+	out, status, err := postJSON("trust-cert")
+	if err != nil {
+		showAboutDialog("Connector çekirdeğine bağlanılamadı.")
+		return
+	}
+	if status >= 400 {
+		msg := "Sertifika güven deposuna eklenemedi."
+		if e, ok := out["error"].(string); ok && e != "" {
+			msg = e
+		}
+		showAboutDialog(msg)
+		return
+	}
+	showAboutDialog("Sertifika kullanıcı deposuna eklendi. Panel artık bu bilgisayara güvenli bağlanabilir.")
 	updateTooltip()
 }
 
@@ -261,29 +281,42 @@ func doApplyUpdate() {
 	_, _, _ = postJSON("update/apply")
 }
 
-func pollHealth(mUpdate, mLogin, mLogout *systray.MenuItem) {
-	ticker := time.NewTicker(12 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
+func applyMenuState(h *healthPayload, mUpdate, mTrust, mLogin, mLogout *systray.MenuItem) {
+	if h.PendingUpdate != nil && h.PendingUpdate.Version != "" {
+		mUpdate.SetTitle(fmt.Sprintf("Güncellemeyi uygula… (v%s)", h.PendingUpdate.Version))
+		mUpdate.Show()
+	} else {
+		mUpdate.Hide()
+	}
+	if h.TLS && !h.CertTrusted {
+		mTrust.Show()
+	} else {
+		mTrust.Hide()
+	}
+	if h.Paired {
+		mLogin.Hide()
+		mLogout.Show()
+	} else {
+		mLogin.Show()
+		mLogout.Hide()
+	}
+}
+
+func pollHealth(mUpdate, mTrust, mLogin, mLogout *systray.MenuItem) {
+	refresh := func() {
 		h, _, err := fetchHealth()
 		if err != nil {
 			mUpdate.Hide()
-			continue
+			return
 		}
-		if h.PendingUpdate != nil && h.PendingUpdate.Version != "" {
-			mUpdate.SetTitle(fmt.Sprintf("Güncellemeyi uygula… (v%s)", h.PendingUpdate.Version))
-			mUpdate.Show()
-		} else {
-			mUpdate.Hide()
-		}
-		if h.Paired {
-			mLogin.Disable()
-			mLogout.Enable()
-		} else {
-			mLogin.Enable()
-			mLogout.Disable()
-		}
+		applyMenuState(h, mUpdate, mTrust, mLogin, mLogout)
 		updateTooltip()
+	}
+	refresh()
+	ticker := time.NewTicker(12 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		refresh()
 	}
 }
 
@@ -312,17 +345,5 @@ func updateTooltip() {
 }
 
 func showAbout() {
-	coreVer := "—"
-	if h, _, err := fetchHealth(); err == nil && h.Version != "" {
-		coreVer = h.Version
-	}
-	body := fmt.Sprintf(
-		"Ankara Yazılım Connector\n\nTray sürümü: %s (%s)\nÇekirdek sürümü: %s\nİşletim sistemi: %s/%s\n\nFiziksel donanımı Ankara Yazılım paneli ile köprüler.\nTüm ayarlar web panelden yapılır.\n\nhttps://ankarayazilim.org/indir",
-		version,
-		build,
-		coreVer,
-		runtime.GOOS,
-		runtime.GOARCH,
-	)
-	showAboutDialog(body)
+	openBrowser(fmt.Sprintf("%sabout?tray=%s&tbuild=%s", statusBaseURL(), version, build))
 }

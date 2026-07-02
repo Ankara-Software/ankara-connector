@@ -4,7 +4,7 @@
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
-!define APP_VERSION "1.1.7"
+!define APP_VERSION "1.1.8"
 !define APP_EXE "AnkaraYazilimConnector.exe"
 !define CORE_EXE "ankara-connector-core.exe"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\AnkaraYazilimConnector"

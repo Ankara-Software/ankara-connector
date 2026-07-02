@@ -6,16 +6,18 @@
 // /health returns JSON for panel presence detection. This is the only native
 // UI — deliberately minimal (brand + state + capabilities), per product spec.
 
+import { buildAboutHtml } from './about-html';
 import { deliverAuthCallback, type AuthCallbackPayload } from './auth-flow';
 import { loadConfig, saveConfig, type PrinterConfig } from './config';
-import { STATUS_LOGO_PNG } from './generated/tray-logo';
 import { bufferDeviceEvent, bufferedEventCount, replayBufferedEvents } from './event-bridge';
+import { BUN_BUILD_VERSION, CONNECTOR_BUILD } from './generated/build-info';
+import { STATUS_LOGO_PNG } from './generated/tray-logo';
 import { logLine } from './logger';
 import type { AckMessage, AgentInfo, Capability, CommandMessage, HelloMessage } from './protocol';
 import { decode, encode, makeAck, makeAckError, makeEvent, PROTOCOL_VERSION } from './protocol';
 import { buildStatusHtml, buildTrustCertResultHtml } from './status-html';
-import { pendingUpdateSummary } from './update';
 import { isCertTrusted, trustLocalhostCert } from './tls-cert';
+import { pendingUpdateSummary } from './update';
 
 /** Origins allowed to talk to the loopback API (roadmap §24, enterprise §1).
  *  Only the production panel + local dev servers may issue commands; a random
@@ -49,7 +51,10 @@ export interface AgentStatus {
 
 export interface StatusServerHooks {
   onLogout?: () => { ok: true } | { ok: false; error: string };
-  onLogin?: () => Promise<{ ok: true; deviceId: string; tenantName?: string } | { ok: false; error: string }>;
+  onLogin?: () => Promise<
+    | { ok: true; started: true }
+    | { ok: false; error: string }
+  >;
   onApplyUpdate?: () => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
@@ -252,15 +257,50 @@ export function startStatusServer(
             pendingUpdate: pending
               ? { version: pending.version, filename: pending.filename }
               : null,
+            runtime: {
+              bun: typeof Bun !== 'undefined' ? Bun.version : BUN_BUILD_VERSION,
+              platform: process.platform,
+              arch: process.arch,
+              build: CONNECTOR_BUILD,
+            },
           },
           { headers: corsHeaders },
         );
       }
-      if ((url.pathname === '/trust-cert' || url.pathname === '/trust-cert/') && req.method === 'GET') {
-        const ok = trustLocalhostCert();
-        return new Response(buildTrustCertResultHtml(ok), {
-          headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders },
-        });
+      if (url.pathname === '/about' || url.pathname === '/about/') {
+        const trayVersion = url.searchParams.get('tray') || undefined;
+        const trayBuild = url.searchParams.get('tbuild') || undefined;
+        const s = status();
+        return new Response(
+          buildAboutHtml({
+            version: s.version,
+            trayVersion,
+            trayBuild,
+            runtime: {
+              bun: typeof Bun !== 'undefined' ? Bun.version : BUN_BUILD_VERSION,
+              platform: process.platform,
+              arch: process.arch,
+              build: CONNECTOR_BUILD,
+            },
+          }),
+          { headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders } },
+        );
+      }
+      if (url.pathname === '/trust-cert' || url.pathname === '/trust-cert/') {
+        if (req.method === 'POST') {
+          const ok = trustLocalhostCert();
+          return Response.json(
+            ok ? { ok: true } : { ok: false, error: 'Sertifika güven deposuna eklenemedi.' },
+            { status: ok ? 200 : 500, headers: corsHeaders },
+          );
+        }
+        if (req.method === 'GET') {
+          const ok = trustLocalhostCert();
+          return new Response(buildTrustCertResultHtml(ok), {
+            headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders },
+          });
+        }
+        return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
       }
       if (url.pathname === '/session/logout' && req.method === 'POST') {
         if (!hooks.onLogout) {

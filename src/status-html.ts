@@ -57,7 +57,8 @@ export function buildStatusHtml(s: AgentStatus, opts: StatusPageOptions): string
       ? `<div class="notice">
   <strong>Yerel güvenlik sertifikası</strong>
   <p>Panelin bu bilgisayardaki yazıcı ve cihazlara güvenli bağlanması için yerel sertifikayı bir kez onaylamanız gerekir.</p>
-  <a class="btn-secondary" href="/trust-cert">Yerel sertifikayı güven</a>
+  <button type="button" class="btn-secondary" onclick="trustCert()">Yerel sertifikayı güven</button>
+  <p id="trust-msg" class="msg" style="margin-top:10px"></p>
 </div>`
       : '';
 
@@ -121,14 +122,58 @@ export function buildStatusHtml(s: AgentStatus, opts: StatusPageOptions): string
     ${s.capabilities.map((c) => `<span class="pill">${esc(String(c))}</span>`).join('')}</div></div>
 </div>
 <script>
+let pollTimer = null;
+
 async function sessionAction(action) {
   const msg = document.getElementById('session-msg');
   msg.style.display = 'none';
   try {
     const r = await fetch('/session/' + action, { method: 'POST' });
     const j = await r.json();
+    if (action === 'login' && j.ok && j.started) {
+      msg.textContent = 'Tarayıcıda oturum açın. Tamamlandığında sayfa otomatik yenilenecek.';
+      msg.style.display = 'block';
+      startPairedPoll();
+      return;
+    }
     if (j.ok) { location.reload(); return; }
     msg.textContent = j.error || 'İşlem başarısız.';
+    msg.style.display = 'block';
+  } catch (e) {
+    msg.textContent = 'Bağlantı hatası.';
+    msg.style.display = 'block';
+  }
+}
+
+function startPairedPoll() {
+  if (pollTimer) return;
+  pollTimer = setInterval(async () => {
+    try {
+      const r = await fetch('/health');
+      const h = await r.json();
+      if (h.paired) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        location.reload();
+      }
+    } catch {}
+  }, 2000);
+}
+
+async function trustCert() {
+  const msg = document.getElementById('trust-msg');
+  if (!msg) return;
+  msg.style.display = 'none';
+  try {
+    const r = await fetch('/trust-cert', { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      msg.textContent = 'Sertifika güvene eklendi. Sayfa yenileniyor…';
+      msg.style.display = 'block';
+      setTimeout(() => location.reload(), 1200);
+      return;
+    }
+    msg.textContent = j.error || 'Sertifika eklenemedi. Yönetici izni gerekebilir.';
     msg.style.display = 'block';
   } catch (e) {
     msg.textContent = 'Bağlantı hatası.';

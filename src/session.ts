@@ -31,29 +31,49 @@ export function logoutSession(): { ok: true } {
   return { ok: true };
 }
 
-/** Start web auth flow (opens browser). Returns when paired or throws on timeout. */
-export async function loginSession(): Promise<{ ok: true; deviceId: string; tenantName?: string }> {
+export type LoginStartResult =
+  | { ok: true; started: true }
+  | { ok: false; error: string };
+
+let loginInProgress = false;
+
+/** Open web auth in browser immediately; pairing completes asynchronously via callback. */
+export function startLoginSession(): LoginStartResult {
   const cfg = loadConfig();
   if (cfg.token && cfg.deviceId) {
-    throw new Error('Zaten oturum açık.');
+    return { ok: false, error: 'Zaten oturum açık.' };
   }
+  if (loginInProgress) {
+    return { ok: true, started: true };
+  }
+  loginInProgress = true;
   saveConfig({ ...cfg, sessionPaused: false });
   cancelAllPendingAuth();
-  const auth = await waitForWebAuth(loadConfig());
-  const next: ConnectorConfig = {
-    ...loadConfig(),
-    token: auth.token,
-    deviceId: auth.deviceId,
-    label: cfg.label || 'Connector',
-    tenantName: auth.tenantName ?? cfg.tenantName,
-    pairedAt: new Date().toISOString(),
-    sessionPaused: false,
-  };
-  saveConfig(next);
-  notifySessionChanged();
-  logLine('info', `Oturum açıldı — cihaz ${auth.deviceId}.`);
-  if (auth.tenantName) logLine('info', `Firma: ${auth.tenantName}`);
-  return { ok: true, deviceId: auth.deviceId, tenantName: auth.tenantName };
+
+  void (async () => {
+    try {
+      const auth = await waitForWebAuth(loadConfig());
+      const next: ConnectorConfig = {
+        ...loadConfig(),
+        token: auth.token,
+        deviceId: auth.deviceId,
+        label: cfg.label || 'Connector',
+        tenantName: auth.tenantName ?? cfg.tenantName,
+        pairedAt: new Date().toISOString(),
+        sessionPaused: false,
+      };
+      saveConfig(next);
+      notifySessionChanged();
+      logLine('info', `Oturum açıldı — cihaz ${auth.deviceId}.`);
+      if (auth.tenantName) logLine('info', `Firma: ${auth.tenantName}`);
+    } catch (e) {
+      logLine('warn', (e as Error).message);
+    } finally {
+      loginInProgress = false;
+    }
+  })();
+
+  return { ok: true, started: true };
 }
 
 export function shouldSkipAutoAuth(cfg: ConnectorConfig): boolean {

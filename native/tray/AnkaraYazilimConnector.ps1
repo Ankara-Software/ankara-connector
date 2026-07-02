@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$script:Version = '1.1.7'
+$script:Version = '1.1.8'
 $script:StatusPort = 4781
 $script:InstallDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $script:CoreExe = Join-Path $InstallDir 'ankara-connector-core.exe'
@@ -94,30 +94,60 @@ function Update-TrayTooltip {
   }
 }
 
+function Update-MenuState {
+  param(
+    [System.Windows.Forms.ToolStripMenuItem]$LoginItem,
+    [System.Windows.Forms.ToolStripMenuItem]$LogoutItem,
+    [System.Windows.Forms.ToolStripMenuItem]$TrustItem,
+    [System.Windows.Forms.ToolStripMenuItem]$UpdateItem
+  )
+  $r = Invoke-Health
+  if (-not $r) {
+    $UpdateItem.Visible = $false
+    return
+  }
+  if ($r.paired) {
+    $LoginItem.Visible = $false
+    $LogoutItem.Visible = $true
+  } else {
+    $LoginItem.Visible = $true
+    $LogoutItem.Visible = $false
+  }
+  if ($r.tls -and -not $r.certTrusted) {
+    $TrustItem.Visible = $true
+  } else {
+    $TrustItem.Visible = $false
+  }
+  if ($r.pendingUpdate -and $r.pendingUpdate.version) {
+    $UpdateItem.Text = "Güncellemeyi uygula… (v$($r.pendingUpdate.version))"
+    $UpdateItem.Visible = $true
+  } else {
+    $UpdateItem.Visible = $false
+  }
+}
+
 function Show-About {
-  $coreVer = '—'
-  try {
-    $r = Invoke-Health
-    if ($r.version) { $coreVer = $r.version }
-  } catch {}
-  $body = @"
-Ankara Yazılım Connector
+  $base = (Get-StatusBaseUrl).TrimEnd('/')
+  Start-Process "$base/about?tray=$($script:Version)&tbuild=ps1"
+}
 
-Tray sürümü: $($script:Version)
-Çekirdek sürümü: $coreVer
-İşletim sistemi: Windows
-
-Fiziksel donanımı Ankara Yazılım paneli ile köprüler.
-Tüm ayarlar web panelden yapılır.
-
-https://ankarayazilim.org/indir
-"@
-  [System.Windows.Forms.MessageBox]::Show(
-    $body,
-    'Ankara Yazılım Connector',
-    [System.Windows.Forms.MessageBoxButtons]::OK,
-    [System.Windows.Forms.MessageBoxIcon]::Information
-  ) | Out-Null
+function Invoke-TrustCert {
+  $r = Invoke-StatusPost -Path 'trust-cert'
+  if ($r -and $r.ok) {
+    [System.Windows.Forms.MessageBox]::Show(
+      'Sertifika Windows kullanıcı deposuna eklendi.',
+      'Yerel sertifika',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Information
+    ) | Out-Null
+  } else {
+    [System.Windows.Forms.MessageBox]::Show(
+      'Sertifika güven deposuna eklenemedi.',
+      'Yerel sertifika',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Warning
+    ) | Out-Null
+  }
 }
 
 function Invoke-Logout {
@@ -128,7 +158,22 @@ function Invoke-Logout {
 }
 
 function Invoke-Login {
-  $null = Invoke-StatusPost -Path 'session/login'
+  $r = Invoke-StatusPost -Path 'session/login'
+  if ($r -and $r.ok) {
+    [System.Windows.Forms.MessageBox]::Show(
+      'Tarayıcıda oturum açma sayfası açıldı.',
+      'Oturum aç',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Information
+    ) | Out-Null
+  } else {
+    [System.Windows.Forms.MessageBox]::Show(
+      'Oturum açılamadı. Durum sayfasını kontrol edin.',
+      'Oturum aç',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Warning
+    ) | Out-Null
+  }
 }
 
 Start-AgentCore
@@ -143,18 +188,15 @@ $tray.Visible = $true
 Update-TrayTooltip -Tray $tray
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
-$null = $menu.Items.Add('Durumu Aç', $null, { Start-Process (Get-StatusBaseUrl) })
-$null = $menu.Items.Add('Yerel sertifikayı güven…', $null, {
-  $base = (Get-StatusBaseUrl).TrimEnd('/')
-  Start-Process "$base/trust-cert"
-})
-$null = $menu.Items.Add('Oturum aç…', $null, { Invoke-Login })
-$null = $menu.Items.Add('Güncellemeyi uygula…', $null, { Invoke-StatusPost -Path 'update/apply' | Out-Null })
-$null = $menu.Items.Add('Hakkında…', $null, { Show-About })
-$null = $menu.Items.Add('Gizlilik politikası…', $null, { Start-Process 'https://ankarayazilim.org/gizlilik/' })
-$null = $menu.Items.Add('KVKK aydınlatma…', $null, { Start-Process 'https://ankarayazilim.org/kvkk/' })
+$mOpen = $menu.Items.Add('Durumu Aç', $null, { Start-Process (Get-StatusBaseUrl) })
+$mTrust = $menu.Items.Add('Yerel sertifikayı güven…', $null, { Invoke-TrustCert })
+$mLogin = $menu.Items.Add('Oturum aç…', $null, { Invoke-Login })
+$mUpdate = $menu.Items.Add('Güncellemeyi uygula…', $null, { Invoke-StatusPost -Path 'update/apply' | Out-Null })
+$mUpdate.Visible = $false
+$mAbout = $menu.Items.Add('Hakkında…', $null, { Show-About })
 $null = $menu.Items.Add('-')
-$null = $menu.Items.Add('Oturumu Kapat', $null, { Invoke-Logout; Update-TrayTooltip -Tray $tray })
+$mLogout = $menu.Items.Add('Oturumu Kapat', $null, { Invoke-Logout; Update-TrayTooltip -Tray $tray })
+$mLogout.Visible = $false
 $null = $menu.Items.Add('-')
 $null = $menu.Items.Add('Çıkış', $null, {
   $tray.Visible = $false
@@ -165,8 +207,12 @@ $tray.ContextMenuStrip = $menu
 
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 12000
-$timer.Add_Tick({ Update-TrayTooltip -Tray $tray })
+$timer.Add_Tick({
+  Update-TrayTooltip -Tray $tray
+  Update-MenuState -LoginItem $mLogin -LogoutItem $mLogout -TrustItem $mTrust -UpdateItem $mUpdate
+})
 $timer.Start()
+Update-MenuState -LoginItem $mLogin -LogoutItem $mLogout -TrustItem $mTrust -UpdateItem $mUpdate
 
 Register-EngineEvent PowerShell.Exiting -Action { Stop-AgentCore } | Out-Null
 [System.Windows.Forms.Application]::Run()

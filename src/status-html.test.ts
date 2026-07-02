@@ -13,7 +13,7 @@ const sample: AgentStatus = {
   capabilities: ['scanner.barcode', 'scanner.qr'],
   printer: null,
   startedAt: '2026-07-01T12:00:00.000Z',
-  version: '1.1.7',
+  version: '1.1.8',
   sessionPaused: false,
 };
 
@@ -39,13 +39,13 @@ describe('status-html', () => {
 
   it('shows trust banner when TLS on and cert not trusted', () => {
     const html = buildStatusHtml(sample, { tlsEnabled: true, certTrusted: false });
-    expect(html).toContain('/trust-cert');
+    expect(html).toContain('trustCert()');
     expect(html).toContain('Yerel sertifikayı güven');
   });
 
   it('hides trust banner when cert already trusted', () => {
     const html = buildStatusHtml(sample, { tlsEnabled: true, certTrusted: true });
-    expect(html).not.toContain('/trust-cert');
+    expect(html).not.toContain('Yerel güvenlik sertifikası');
   });
 
   it('shows session section and logout when paired', () => {

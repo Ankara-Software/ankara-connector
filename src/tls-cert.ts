@@ -101,6 +101,33 @@ function certPathFile(): string {
   return join(tlsDir(), 'localhost.crt');
 }
 
+/** Windows: certutil first, then PowerShell Import-Certificate fallback. */
+function installCertWindowsUserStore(certPath: string): boolean {
+  try {
+    execFileSync('certutil', ['-user', '-addstore', 'Root', certPath], { stdio: 'ignore' });
+    return true;
+  } catch {
+    /* certutil may fail on some builds — try PowerShell */
+  }
+  try {
+    const escaped = certPath.replace(/'/g, "''");
+    execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        `Import-Certificate -FilePath '${escaped}' -CertStoreLocation 'Cert:\\CurrentUser\\Root' | Out-Null`,
+      ],
+      { stdio: 'ignore' },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** True when config marks the localhost cert as user-trusted and the file exists. */
 export function isCertTrusted(): boolean {
   const cfg = loadConfig();
@@ -119,10 +146,11 @@ export function installCertToTrustStore(certPath: string = certPathFile()): bool
   const platform = process.platform;
   try {
     if (platform === 'win32') {
-      // Current-user Root store — no elevation required for most browsers.
-      execFileSync('certutil', ['-user', '-addstore', 'Root', certPath], { stdio: 'ignore' });
-      logLine('info', 'tls: sertifika Windows kullanıcı kök deposuna eklendi.');
-      return true;
+      if (installCertWindowsUserStore(certPath)) {
+        logLine('info', 'tls: sertifika Windows kullanıcı kök deposuna eklendi.');
+        return true;
+      }
+      return false;
     }
     if (platform === 'darwin') {
       execFileSync(

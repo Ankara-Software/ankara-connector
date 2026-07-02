@@ -26,7 +26,7 @@ import (
 var iconData []byte
 
 var (
-	version = "1.1.7"
+	version = "1.1.8"
 	build   = "dev"
 )
 
@@ -110,31 +110,26 @@ func onReady() {
 	mUpdate := systray.AddMenuItem("Güncellemeyi uygula…", "Bekleyen güncellemeyi kur")
 	mUpdate.Hide()
 	mAbout := systray.AddMenuItem("Hakkında…", "Sürüm bilgisi")
-	mPrivacy := systray.AddMenuItem("Gizlilik politikası…", "Web sitesinde aç")
-	mKvkk := systray.AddMenuItem("KVKK aydınlatma…", "Web sitesinde aç")
 	systray.AddSeparator()
 	mLogout := systray.AddMenuItem("Oturumu Kapat", "Yerel oturumu sıfırla")
+	mLogout.Hide()
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Çıkış", "Connector'ı kapat")
 
-	go pollHealth(mUpdate, mLogin, mLogout)
+	go pollHealth(mUpdate, mTrust, mLogin, mLogout)
 	go func() {
 		for {
 			select {
 			case <-mOpen.ClickedCh:
 				openBrowser(statusBaseURL())
 			case <-mTrust.ClickedCh:
-				openBrowser(statusPath("trust-cert"))
+				doTrustCert()
 			case <-mLogin.ClickedCh:
 				doLogin()
 			case <-mUpdate.ClickedCh:
 				doApplyUpdate()
 			case <-mAbout.ClickedCh:
 				showAbout()
-			case <-mPrivacy.ClickedCh:
-				openBrowser("https://ankarayazilim.org/gizlilik/")
-			case <-mKvkk.ClickedCh:
-				openBrowser("https://ankarayazilim.org/kvkk/")
 			case <-mLogout.ClickedCh:
 				doLogout()
 			case <-mQuit.ClickedCh:
@@ -246,14 +241,39 @@ func doLogout() {
 }
 
 func doLogin() {
-	_, status, err := postJSON("session/login")
+	out, status, err := postJSON("session/login")
 	if err != nil {
-		openBrowser(statusPath(""))
+		showMessageBox("Oturum aç", "Connector çekirdeğine bağlanılamadı. Durum sayfasını kontrol edin.", true)
+		openBrowser(statusBaseURL())
 		return
 	}
 	if status >= 400 {
-		openBrowser(statusPath(""))
+		msg := "Oturum açılamadı."
+		if e, ok := out["error"].(string); ok && e != "" {
+			msg = e
+		}
+		showMessageBox("Oturum aç", msg, true)
+		return
 	}
+	showMessageBox("Oturum aç", "Tarayıcıda oturum açma sayfası açıldı. Giriş yaptıktan sonra tray simgesi güncellenecek.", false)
+	updateTooltip()
+}
+
+func doTrustCert() {
+	out, status, err := postJSON("trust-cert")
+	if err != nil {
+		showMessageBox("Yerel sertifika", "Connector çekirdeğine bağlanılamadı.", true)
+		return
+	}
+	if status >= 400 {
+		msg := "Sertifika güven deposuna eklenemedi."
+		if e, ok := out["error"].(string); ok && e != "" {
+			msg = e
+		}
+		showMessageBox("Yerel sertifika", msg, true)
+		return
+	}
+	showMessageBox("Yerel sertifika", "Sertifika Windows kullanıcı deposuna eklendi. Panel artık bu bilgisayara güvenli bağlanabilir.", false)
 	updateTooltip()
 }
 
@@ -261,29 +281,42 @@ func doApplyUpdate() {
 	_, _, _ = postJSON("update/apply")
 }
 
-func pollHealth(mUpdate, mLogin, mLogout *systray.MenuItem) {
-	ticker := time.NewTicker(12 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
+func applyMenuState(h *healthPayload, mUpdate, mTrust, mLogin, mLogout *systray.MenuItem) {
+	if h.PendingUpdate != nil && h.PendingUpdate.Version != "" {
+		mUpdate.SetTitle(fmt.Sprintf("Güncellemeyi uygula… (v%s)", h.PendingUpdate.Version))
+		mUpdate.Show()
+	} else {
+		mUpdate.Hide()
+	}
+	if h.TLS && !h.CertTrusted {
+		mTrust.Show()
+	} else {
+		mTrust.Hide()
+	}
+	if h.Paired {
+		mLogin.Hide()
+		mLogout.Show()
+	} else {
+		mLogin.Show()
+		mLogout.Hide()
+	}
+}
+
+func pollHealth(mUpdate, mTrust, mLogin, mLogout *systray.MenuItem) {
+	refresh := func() {
 		h, _, err := fetchHealth()
 		if err != nil {
 			mUpdate.Hide()
-			continue
+			return
 		}
-		if h.PendingUpdate != nil && h.PendingUpdate.Version != "" {
-			mUpdate.SetTitle(fmt.Sprintf("Güncellemeyi uygula… (v%s)", h.PendingUpdate.Version))
-			mUpdate.Show()
-		} else {
-			mUpdate.Hide()
-		}
-		if h.Paired {
-			mLogin.Disable()
-			mLogout.Enable()
-		} else {
-			mLogin.Enable()
-			mLogout.Disable()
-		}
+		applyMenuState(h, mUpdate, mTrust, mLogin, mLogout)
 		updateTooltip()
+	}
+	refresh()
+	ticker := time.NewTicker(12 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		refresh()
 	}
 }
 
@@ -320,25 +353,21 @@ func openBrowser(url string) {
 }
 
 func showAbout() {
-	coreVer := "—"
-	if h, _, err := fetchHealth(); err == nil && h.Version != "" {
-		coreVer = h.Version
+	openBrowser(fmt.Sprintf("%sabout?tray=%s&tbuild=%s", statusBaseURL(), version, build))
+}
+
+func showMessageBox(title, body string, isError bool) {
+	if runtime.GOOS != "windows" {
+		return
 	}
-	body := fmt.Sprintf(
-		"Ankara Yazılım Connector\r\n\r\nTray sürümü: %s (%s)\r\nÇekirdek sürümü: %s\r\nİşletim sistemi: %s/%s\r\n\r\nFiziksel donanımı Ankara Yazılım paneli ile köprüler.\r\nTüm ayarlar web panelden yapılır.\r\n\r\nhttps://ankarayazilim.org/indir",
-		version,
-		build,
-		coreVer,
-		runtime.GOOS,
-		runtime.GOARCH,
-	)
-	if runtime.GOOS == "windows" {
-		title, _ := syscall.UTF16PtrFromString("Ankara Yazılım Connector")
-		text, _ := syscall.UTF16PtrFromString(body)
-		user32 := syscall.NewLazyDLL("user32.dll")
-		messageBoxW := user32.NewProc("MessageBoxW")
-		const mbOK = 0
-		const mbIconInformation = 0x40
-		messageBoxW.Call(0, uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(title)), mbOK|mbIconInformation)
+	t, _ := syscall.UTF16PtrFromString(title)
+	text, _ := syscall.UTF16PtrFromString(body)
+	user32 := syscall.NewLazyDLL("user32.dll")
+	messageBoxW := user32.NewProc("MessageBoxW")
+	const mbOK = 0
+	flags := uintptr(0x40)
+	if isError {
+		flags = 0x10
 	}
+	messageBoxW.Call(0, uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(t)), mbOK|flags)
 }
