@@ -155,7 +155,7 @@ pub async fn start_login_flow() -> Result<()> {
         let state = cfg.pending_pair_state.clone().unwrap();
         save_config(&cfg)?;
         info!("Bekleyen oturum kodu ile devam ediliyor…");
-        return poll_pair_result(&state).await;
+        return poll_pair_result(&state).await.map(|_| ());
     }
 
     if pair_cooldown_active(&cfg) {
@@ -170,7 +170,7 @@ pub async fn start_login_flow() -> Result<()> {
     save_config(&cfg)?;
 
     open_pair_url(&state)?;
-    poll_pair_result(&state).await
+    poll_pair_result(&state).await.map(|_| ())
 }
 
 pub fn logout_session() -> Result<()> {
