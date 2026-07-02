@@ -5,7 +5,7 @@ import { copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { rcedit } from 'rcedit';
 
-const VERSION = '2.0.0';
+const VERSION = '2.0.1';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const ICO = join(ROOT, 'windows', 'assets', 'ankara-yazilim.ico');
