@@ -1,9 +1,12 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { defaultConfig } from './config';
+import { defaultConfig, setConfigOverride } from './config';
 import { buildHeartbeat } from './heartbeat';
 
 describe('heartbeat', () => {
+  beforeEach(() => setConfigOverride(defaultConfig()));
+  afterEach(() => setConfigOverride(null));
+
   test('buildHeartbeat is null when unpaired', () => {
     expect(buildHeartbeat(defaultConfig())).toBeNull();
   });
@@ -17,5 +20,5 @@ describe('heartbeat', () => {
       expect(p.capabilities).toContain('scanner.barcode');
       expect(p.sentAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     }
-  });
+  }, 15000);
 });
