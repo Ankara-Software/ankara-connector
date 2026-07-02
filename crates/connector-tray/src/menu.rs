@@ -39,37 +39,34 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
     let tray_arc = Arc::new(tray);
     update_tooltip(&tray_arc);
 
-    let tray_poll = tray_arc.clone();
-    let login_item = login.clone();
-    let logout_item = logout.clone();
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(4));
-            update_visibility(&login_item, &logout_item);
-            update_tooltip(&tray_poll);
-        }
-    });
-
     let menu_channel = MenuEvent::receiver();
     loop {
-        if let Ok(event) = menu_channel.recv() {
-            if event.id == open_status.id() {
-                let _ = open::that(DEFAULT_SITE);
-            } else if event.id == login.id() {
-                let _ = actions.login_tx.send(());
-            } else if event.id == logout.id() {
-                let _ = actions.logout_tx.send(());
-                if logout_session().is_ok() {
-                    update_visibility(&login, &logout);
-                    update_tooltip(&tray_arc);
+        match menu_channel.recv_timeout(std::time::Duration::from_secs(4)) {
+            Ok(event) => {
+                if event.id == open_status.id() {
+                    let _ = open::that(DEFAULT_SITE);
+                } else if event.id == login.id() {
+                    let _ = actions.login_tx.send(());
+                } else if event.id == logout.id() {
+                    let _ = actions.logout_tx.send(());
+                    if logout_session().is_ok() {
+                        update_visibility(&login, &logout);
+                        update_tooltip(&tray_arc);
+                    }
+                } else if event.id == about.id() {
+                    show_about(CONNECTOR_VERSION, "rust", CONNECTOR_VERSION);
+                } else if event.id == quit.id() {
+                    std::process::exit(0);
                 }
-            } else if event.id == about.id() {
-                show_about(CONNECTOR_VERSION, "rust", CONNECTOR_VERSION);
-            } else if event.id == quit.id() {
-                std::process::exit(0);
             }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                update_visibility(&login, &logout);
+                update_tooltip(&tray_arc);
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
         }
     }
+    Ok(())
 }
 
 fn update_visibility(login: &MenuItem, logout: &MenuItem) {
