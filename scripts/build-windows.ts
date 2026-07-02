@@ -5,7 +5,7 @@ import { copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { rcedit } from 'rcedit';
 
-const VERSION = '1.1.5';
+const VERSION = '1.1.6';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const ASSETS = join(ROOT, 'windows', 'assets');
@@ -59,7 +59,16 @@ if (process.platform === 'win32' && which('go')) {
   try {
     copyFileSync(ICO, join(TRAY_DIR, 'ankara-yazilim.ico'));
     Bun.spawnSync({ cmd: ['go', 'mod', 'tidy'], cwd: TRAY_DIR, stdout: 'ignore', stderr: 'inherit' });
-    const build = Bun.spawn(['go', 'build', '-ldflags=-H=windowsgui', '-o', trayExe, '.'], {
+    const build = Bun.spawn(
+      [
+        'go',
+        'build',
+        '-ldflags=-H=windowsgui -X main.version=' + VERSION + ' -X main.build=' + (process.env.GITHUB_SHA?.slice(0, 7) || 'local'),
+        '-o',
+        trayExe,
+        '.',
+      ],
+      {
       cwd: TRAY_DIR,
       env: { ...process.env, CGO_ENABLED: '1' },
       stdout: 'inherit',

@@ -1,12 +1,9 @@
-// Cross-platform systray host for Ankara Yazılım Connector (roadmap §4).
-//
-// Builds for Windows, macOS, and Linux from the same source. The systray
-// library (github.com/getlantern/systray) handles the per-OS tray surface;
-// platform-specific bits (open browser, about dialog) live in build-tagged
-// files (open_windows.go / open_unix.go).
+// Cross-platform systray host for Ankara Yazılım Connector.
 package main
 
 import (
+	"bytes"
+	"crypto/tls"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -16,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,36 +23,70 @@ import (
 //go:embed ankara-yazilim.ico
 var iconData []byte
 
-const (
-	version    = "1.1.5"
-	statusPort = 4781
+var (
+	version = "1.1.6"
+	build   = "dev"
 )
+
+const statusPort = 4781
+
+type healthPayload struct {
+	Paired        bool   `json:"paired"`
+	DeviceID      string `json:"deviceId"`
+	Label         string `json:"label"`
+	TenantName    string `json:"tenantName"`
+	TLS           bool   `json:"tls"`
+	CertTrusted   bool   `json:"certTrusted"`
+	Version       string `json:"version"`
+	SessionPaused bool   `json:"sessionPaused"`
+	PendingUpdate *struct {
+		Version  string `json:"version"`
+		Filename string `json:"filename"`
+	} `json:"pendingUpdate"`
+}
 
 var (
 	coreMu   sync.Mutex
 	coreProc *exec.Cmd
 )
 
-type healthPayload struct {
-	Paired      bool   `json:"paired"`
-	DeviceID    string `json:"deviceId"`
-	Label       string `json:"label"`
-	TLS         bool   `json:"tls"`
-	CertTrusted bool   `json:"certTrusted"`
+func httpClient() *http.Client {
+	return &http.Client{
+		Timeout: 3 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // localhost self-signed
+		},
+	}
 }
 
-func statusPageURL() string {
-	scheme := "http"
-	client := http.Client{Timeout: 2 * time.Second}
-	res, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/health", statusPort))
-	if err == nil {
+func fetchHealth() (*healthPayload, string, error) {
+	client := httpClient()
+	for _, scheme := range []string{"https", "http"} {
+		url := fmt.Sprintf("%s://127.0.0.1:%d/health", scheme, statusPort)
+		res, err := client.Get(url)
+		if err != nil {
+			continue
+		}
 		defer res.Body.Close()
 		var h healthPayload
-		if json.NewDecoder(res.Body).Decode(&h) == nil && h.TLS {
-			scheme = "https"
+		if json.NewDecoder(res.Body).Decode(&h) == nil {
+			return &h, scheme, nil
 		}
 	}
+	return nil, "https", fmt.Errorf("health unreachable")
+}
+
+func statusBaseURL() string {
+	_, scheme, err := fetchHealth()
+	if err != nil {
+		return fmt.Sprintf("https://127.0.0.1:%d/", statusPort)
+	}
 	return fmt.Sprintf("%s://127.0.0.1:%d/", scheme, statusPort)
+}
+
+func statusPath(path string) string {
+	base := strings.TrimRight(statusBaseURL(), "/")
+	return base + "/" + strings.TrimLeft(path, "/")
 }
 
 func main() {
@@ -72,22 +104,35 @@ func onReady() {
 
 	mOpen := systray.AddMenuItem("Durumu Aç", "Tarayıcıda durum sayfasını aç")
 	mTrust := systray.AddMenuItem("Yerel sertifikayı güven…", "Panel için yerel TLS sertifikasını onayla")
+	mLogin := systray.AddMenuItem("Oturum aç…", "Panelde oturum aç")
+	mUpdate := systray.AddMenuItem("Güncellemeyi uygula…", "Bekleyen güncellemeyi kur")
+	mUpdate.Hide()
 	mAbout := systray.AddMenuItem("Hakkında…", "Sürüm bilgisi")
+	mPrivacy := systray.AddMenuItem("Gizlilik politikası…", "Web sitesinde aç")
+	mKvkk := systray.AddMenuItem("KVKK aydınlatma…", "Web sitesinde aç")
 	systray.AddSeparator()
 	mLogout := systray.AddMenuItem("Oturumu Kapat", "Yerel oturumu sıfırla")
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Çıkış", "Connector'ı kapat")
 
-	go pollHealth()
+	go pollHealth(mUpdate, mLogin, mLogout)
 	go func() {
 		for {
 			select {
 			case <-mOpen.ClickedCh:
-				openBrowser(statusPageURL())
+				openBrowser(statusBaseURL())
 			case <-mTrust.ClickedCh:
-				openBrowser(statusPageURL() + "trust-cert")
+				openBrowser(statusPath("trust-cert"))
+			case <-mLogin.ClickedCh:
+				doLogin()
+			case <-mUpdate.ClickedCh:
+				doApplyUpdate()
 			case <-mAbout.ClickedCh:
 				showAbout()
+			case <-mPrivacy.ClickedCh:
+				openBrowser("https://ankarayazilim.org/gizlilik/")
+			case <-mKvkk.ClickedCh:
+				openBrowser("https://ankarayazilim.org/kvkk/")
 			case <-mLogout.ClickedCh:
 				doLogout()
 			case <-mQuit.ClickedCh:
@@ -99,7 +144,7 @@ func onReady() {
 }
 
 func onExit() {
-	stopCore()
+	killAllCore()
 }
 
 func installDir() string {
@@ -110,7 +155,6 @@ func installDir() string {
 	return filepath.Dir(exe)
 }
 
-// coreExe returns the platform-correct core binary name.
 func coreExe() string {
 	name := "ankara-connector-core"
 	if runtime.GOOS == "windows" {
@@ -162,66 +206,123 @@ func pipeLogs(r io.Reader) {
 	}
 }
 
-func stopCore() {
+func killAllCore() {
 	coreMu.Lock()
-	defer coreMu.Unlock()
-	if coreProc == nil || coreProc.Process == nil {
-		return
+	if coreProc != nil && coreProc.Process != nil {
+		_ = coreProc.Process.Kill()
+		_ = coreProc.Wait()
+		coreProc = nil
 	}
-	_ = coreProc.Process.Kill()
-	_ = coreProc.Wait()
-	coreProc = nil
+	coreMu.Unlock()
+	if runtime.GOOS == "windows" {
+		_ = exec.Command("taskkill", "/F", "/IM", "ankara-connector-core.exe", "/T").Run()
+	}
+}
+
+func postJSON(path string) (map[string]interface{}, int, error) {
+	client := httpClient()
+	url := statusPath(path)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader([]byte("{}")))
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer res.Body.Close()
+	var out map[string]interface{}
+	_ = json.NewDecoder(res.Body).Decode(&out)
+	return out, res.StatusCode, nil
 }
 
 func doLogout() {
-	stopCore()
-	path := coreExe()
-	if _, err := os.Stat(path); err == nil {
-		cmd := exec.Command(path, "logout")
-		cmd.Dir = installDir()
-		applyHideWindow(cmd)
-		_ = cmd.Run()
-	}
+	_, _, _ = postJSON("session/logout")
+	killAllCore()
+	time.Sleep(300 * time.Millisecond)
 	_ = startCore()
 	updateTooltip()
 }
 
-func pollHealth() {
+func doLogin() {
+	_, status, err := postJSON("session/login")
+	if err != nil {
+		openBrowser(statusPath(""))
+		return
+	}
+	if status >= 400 {
+		openBrowser(statusPath(""))
+	}
+	updateTooltip()
+}
+
+func doApplyUpdate() {
+	_, _, _ = postJSON("update/apply")
+}
+
+func pollHealth(mUpdate, mLogin, mLogout *systray.MenuItem) {
 	ticker := time.NewTicker(12 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
+		h, _, err := fetchHealth()
+		if err != nil {
+			mUpdate.Hide()
+			continue
+		}
+		if h.PendingUpdate != nil && h.PendingUpdate.Version != "" {
+			mUpdate.SetTitle(fmt.Sprintf("Güncellemeyi uygula… (v%s)", h.PendingUpdate.Version))
+			mUpdate.Show()
+		} else {
+			mUpdate.Hide()
+		}
+		if h.Paired {
+			mLogin.Disable()
+			mLogout.Enable()
+		} else {
+			mLogin.Enable()
+			mLogout.Disable()
+		}
 		updateTooltip()
 	}
 }
 
 func updateTooltip() {
-	client := http.Client{Timeout: 2 * time.Second}
-	res, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/health", statusPort))
+	h, _, err := fetchHealth()
 	if err != nil {
 		systray.SetTooltip("Ankara Yazılım Connector — başlatılıyor…")
 		return
 	}
-	defer res.Body.Close()
-	var h healthPayload
-	if err := json.NewDecoder(res.Body).Decode(&h); err != nil {
-		systray.SetTooltip("Ankara Yazılım Connector")
-		return
-	}
 	if h.Paired {
-		label := h.Label
+		label := h.TenantName
+		if label == "" {
+			label = h.Label
+		}
 		if label == "" {
 			label = h.DeviceID
 		}
 		systray.SetTooltip(fmt.Sprintf("Ankara Yazılım Connector — Bağlı (%s)", label))
 		return
 	}
+	if h.SessionPaused {
+		systray.SetTooltip("Ankara Yazılım Connector — Oturum kapalı")
+		return
+	}
 	systray.SetTooltip("Ankara Yazılım Connector — Oturum bekleniyor")
 }
 
 func showAbout() {
+	coreVer := "—"
+	if h, _, err := fetchHealth(); err == nil && h.Version != "" {
+		coreVer = h.Version
+	}
 	body := fmt.Sprintf(
-		"Ankara Yazılım Connector %s\n\nFiziksel donanımı Ankara Yazılım paneli ile köprüler.\nTüm ayarlar web panelden yapılır.\n\nhttps://ankarayazilim.org/indir",
+		"Ankara Yazılım Connector\n\nTray sürümü: %s (%s)\nÇekirdek sürümü: %s\nİşletim sistemi: %s/%s\n\nFiziksel donanımı Ankara Yazılım paneli ile köprüler.\nTüm ayarlar web panelden yapılır.\n\nhttps://ankarayazilim.org/indir",
 		version,
+		build,
+		coreVer,
+		runtime.GOOS,
+		runtime.GOARCH,
 	)
 	showAboutDialog(body)
 }

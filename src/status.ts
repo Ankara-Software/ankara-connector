@@ -8,12 +8,13 @@
 
 import { deliverAuthCallback, type AuthCallbackPayload } from './auth-flow';
 import { loadConfig, saveConfig, type PrinterConfig } from './config';
-import { TRAY_LOGO_PNG } from './generated/tray-logo';
+import { STATUS_LOGO_PNG } from './generated/tray-logo';
 import { bufferDeviceEvent, bufferedEventCount, replayBufferedEvents } from './event-bridge';
 import { logLine } from './logger';
 import type { AckMessage, AgentInfo, Capability, CommandMessage, HelloMessage } from './protocol';
 import { decode, encode, makeAck, makeAckError, makeEvent, PROTOCOL_VERSION } from './protocol';
 import { buildStatusHtml, buildTrustCertResultHtml } from './status-html';
+import { pendingUpdateSummary } from './update';
 import { isCertTrusted, trustLocalhostCert } from './tls-cert';
 
 /** Origins allowed to talk to the loopback API (roadmap §24, enterprise §1).
@@ -36,10 +37,20 @@ export interface AgentStatus {
   paired: boolean;
   deviceId: string | null;
   label: string | null;
+  tenantName: string | null;
+  pairedAt: string | null;
   apiBase: string;
   capabilities: Capability[];
   printer: { host: string; port: number } | null;
   startedAt: string;
+  version: string;
+  sessionPaused: boolean;
+}
+
+export interface StatusServerHooks {
+  onLogout?: () => { ok: true } | { ok: false; error: string };
+  onLogin?: () => Promise<{ ok: true; deviceId: string; tenantName?: string } | { ok: false; error: string }>;
+  onApplyUpdate?: () => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 export type CommandHandler = (
@@ -94,6 +105,7 @@ export function startStatusServer(
   handler: (cap: Capability) => CommandHandler | null,
   agent: () => AgentInfo,
   tls?: { cert: string; key: string } | null,
+  hooks: StatusServerHooks = {},
 ): void {
   const corsHeadersFor = (origin: string | null): Record<string, string> => {
     if (origin && ALLOWED_ORIGINS.has(origin)) {
@@ -229,6 +241,7 @@ export function startStatusServer(
         return new Response(null, { status: 204, headers: corsHeaders });
       }
       if (url.pathname === '/health') {
+        const pending = pendingUpdateSummary();
         return Response.json(
           {
             ok: true,
@@ -236,18 +249,47 @@ export function startStatusServer(
             tls: !!tls,
             certTrusted: tls ? isCertTrusted() : true,
             bufferedEvents: bufferedEventCount(),
+            pendingUpdate: pending
+              ? { version: pending.version, filename: pending.filename }
+              : null,
           },
           { headers: corsHeaders },
         );
       }
-      if (url.pathname === '/trust-cert' && req.method === 'GET') {
+      if ((url.pathname === '/trust-cert' || url.pathname === '/trust-cert/') && req.method === 'GET') {
         const ok = trustLocalhostCert();
         return new Response(buildTrustCertResultHtml(ok), {
           headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders },
         });
       }
+      if (url.pathname === '/session/logout' && req.method === 'POST') {
+        if (!hooks.onLogout) {
+          return Response.json({ ok: false, error: 'Desteklenmiyor.' }, { status: 501, headers: corsHeaders });
+        }
+        const r = hooks.onLogout();
+        return Response.json(r, { status: r.ok ? 200 : 400, headers: corsHeaders });
+      }
+      if (url.pathname === '/session/login' && req.method === 'POST') {
+        if (!hooks.onLogin) {
+          return Response.json({ ok: false, error: 'Desteklenmiyor.' }, { status: 501, headers: corsHeaders });
+        }
+        return hooks
+          .onLogin()
+          .then((r) => Response.json(r, { status: r.ok ? 200 : 409, headers: corsHeaders }))
+          .catch((e) =>
+            Response.json({ ok: false, error: (e as Error).message }, { status: 500, headers: corsHeaders }),
+          );
+      }
+      if (url.pathname === '/update/apply' && req.method === 'POST') {
+        if (!hooks.onApplyUpdate) {
+          return Response.json({ ok: false, error: 'Desteklenmiyor.' }, { status: 501, headers: corsHeaders });
+        }
+        return hooks
+          .onApplyUpdate()
+          .then((r) => Response.json(r, { status: r.ok ? 200 : 400, headers: corsHeaders }));
+      }
       if (url.pathname === '/assets/logo.png') {
-        return new Response(TRAY_LOGO_PNG, {
+        return new Response(STATUS_LOGO_PNG, {
           headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400', ...corsHeaders },
         });
       }

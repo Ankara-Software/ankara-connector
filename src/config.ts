@@ -46,6 +46,8 @@ export interface ConnectorConfig {
   crashReporting?: boolean;
   /** User opted in to trust the localhost TLS cert in the OS store. */
   tlsCertTrusted?: boolean;
+  /** When true, agent does not auto-open browser for pairing until user clicks login. */
+  sessionPaused?: boolean;
 }
 
 export interface PrinterConfig {

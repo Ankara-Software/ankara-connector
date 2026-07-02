@@ -36,6 +36,15 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function formatPairedAt(iso: string | null): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('tr-TR');
+  } catch {
+    return iso;
+  }
+}
+
 export function buildStatusHtml(s: AgentStatus, opts: StatusPageOptions): string {
   const panelUrl = panelConnectorUrl(s.apiBase);
   const pairUrl = panelPairUrl(s.apiBase);
@@ -54,7 +63,17 @@ export function buildStatusHtml(s: AgentStatus, opts: StatusPageOptions): string
 
   const primaryBtn = s.paired
     ? `<a class="btn-primary" href="${esc(panelUrl)}" target="_blank" rel="noopener">Cihazları panelde yönet</a>`
-    : `<a class="btn-primary" href="${esc(pairUrl)}" target="_blank" rel="noopener">Önce panelde oturum açın</a>`;
+    : `<button type="button" class="btn-primary" onclick="sessionAction('login')">Oturum aç</button>`;
+
+  const sessionActionBtn = s.paired
+    ? `<button type="button" class="btn-secondary" onclick="sessionAction('logout')">Oturumu kapat</button>`
+    : '';
+
+  const sessionStatus = s.paired
+    ? `<span class="ok">Bağlı</span>`
+    : s.sessionPaused
+      ? `<span class="warn">Oturum kapalı</span>`
+      : `<span class="warn">Oturum bekleniyor</span>`;
 
   return `<!doctype html><html lang="tr"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -63,11 +82,12 @@ export function buildStatusHtml(s: AgentStatus, opts: StatusPageOptions): string
   body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0b1220;color:#e6edf7;margin:0;padding:40px}
   .card{max-width:640px;margin:0 auto;border:1px solid #1f2d44;border-radius:16px;padding:32px;background:#0f172a}
   .brand{display:flex;align-items:center;gap:14px;margin-bottom:20px}
-  .brand-logo{height:48px;width:48px;border-radius:10px;object-fit:contain;background:#002147;border:1px solid #1f2d44}
+  .brand-logo{height:44px;width:auto;max-width:180px;border-radius:8px;object-fit:contain;background:#fff;padding:6px 10px;border:1px solid #1f2d44}
   h1{font-size:20px;margin:0}
   .subtitle{color:#9fb3cf;font-size:13px;margin:4px 0 0}
+  .section-title{font-size:13px;font-weight:600;color:#9fb3cf;margin:24px 0 8px;text-transform:uppercase;letter-spacing:.04em}
   .actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 8px}
-  .btn-primary,.btn-secondary{display:inline-block;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none}
+  .btn-primary,.btn-secondary{display:inline-block;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;border:none;cursor:pointer;font-family:inherit}
   .btn-primary{background:#002147;color:#fff;border:1px solid #1f3a5f}
   .btn-primary:hover{background:#0a2d5c}
   .btn-secondary{background:#13203a;color:#e6edf7;border:1px solid #1f2d44}
@@ -80,20 +100,43 @@ export function buildStatusHtml(s: AgentStatus, opts: StatusPageOptions): string
   .link:hover{text-decoration:underline}
   .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:#13203a;border:1px solid #1f2d44;font-size:12px;margin:3px 4px 0 0}
   .ok{color:#34d399}.warn{color:#fbbf24}
+  .msg{margin-top:12px;font-size:13px;color:#fbbf24;display:none}
 </style></head><body><div class="card">
-  <div class="brand"><img src="/assets/logo.png" alt="Ankara Yazılım" class="brand-logo" width="48" height="48"/>
-    <div><h1>Ankara Yazılım Connector</h1><p class="subtitle">Yerel durum ve cihaz köprüsü</p></div></div>
+  <div class="brand"><img src="/assets/logo.png" alt="Ankara Yazılım" class="brand-logo" width="180" height="44"/>
+    <div><h1>Ankara Yazılım Connector</h1><p class="subtitle">Yerel durum ve cihaz köprüsü · sürüm ${esc(s.version)}</p></div></div>
   ${trustBanner}
-  <div class="actions">${primaryBtn}</div>
-  <div class="row"><span>Durum</span><span class="${s.paired ? 'ok' : 'warn'}">${s.paired ? 'Bağlı' : 'Oturum bekleniyor'}</span></div>
-  <div class="row"><span>Cihaz</span><span>${esc(s.deviceId ?? '—')}</span></div>
+  <div class="section-title">Oturum</div>
+  <div class="row"><span>Durum</span><span>${sessionStatus}</span></div>
+  <div class="row"><span>Firma</span><span>${esc(s.tenantName ?? '—')}</span></div>
+  <div class="row"><span>Eşleşme</span><span>${esc(formatPairedAt(s.pairedAt))}</span></div>
+  <div class="actions">${primaryBtn}${sessionActionBtn}</div>
+  <p id="session-msg" class="msg"></p>
+  <div class="section-title">Cihaz</div>
+  <div class="row"><span>Cihaz kimliği</span><span>${esc(s.deviceId ?? '—')}</span></div>
   <div class="row"><span>Etiket</span><span>${esc(s.label ?? '—')}</span></div>
   <div class="row"><span>Sunucu</span><span>${esc(s.apiBase)}</span></div>
   <div class="row"><span>Yazıcı</span><span>${printerCell}</span></div>
   <div class="row"><span>Başlangıç</span><span>${esc(s.startedAt)}</span></div>
   <div style="margin-top:16px"><strong style="font-size:13px">Yetenekler</strong><div style="margin-top:8px">
     ${s.capabilities.map((c) => `<span class="pill">${esc(String(c))}</span>`).join('')}</div></div>
-</div></body></html>`;
+</div>
+<script>
+async function sessionAction(action) {
+  const msg = document.getElementById('session-msg');
+  msg.style.display = 'none';
+  try {
+    const r = await fetch('/session/' + action, { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) { location.reload(); return; }
+    msg.textContent = j.error || 'İşlem başarısız.';
+    msg.style.display = 'block';
+  } catch (e) {
+    msg.textContent = 'Bağlantı hatası.';
+    msg.style.display = 'block';
+  }
+}
+</script>
+</body></html>`;
 }
 
 export function buildTrustCertResultHtml(ok: boolean): string {

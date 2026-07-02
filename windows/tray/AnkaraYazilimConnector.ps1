@@ -1,16 +1,51 @@
-# Ankara Yazılım Connector — Windows systray host.
+# Ankara Yazılım Connector — Windows systray host (PowerShell fallback).
 # Starts ankara-connector-core.exe hidden; shows tray icon + About + logout menu.
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$script:Version = '1.1.5'
+$script:Version = '1.1.6'
 $script:StatusPort = 4781
 $script:InstallDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $script:CoreExe = Join-Path $InstallDir 'ankara-connector-core.exe'
 $script:IconPath = Join-Path $InstallDir 'ankara-yazilim.ico'
 $script:CoreProc = $null
+
+function Invoke-Health {
+  foreach ($scheme in @('https', 'http')) {
+    try {
+      if ($scheme -eq 'https') {
+        return Invoke-RestMethod -Uri "$scheme://127.0.0.1:$($script:StatusPort)/health" -TimeoutSec 3 -SkipCertificateCheck
+      }
+      return Invoke-RestMethod -Uri "$scheme://127.0.0.1:$($script:StatusPort)/health" -TimeoutSec 3
+    } catch {}
+  }
+  return $null
+}
+
+function Get-StatusBaseUrl {
+  try {
+    $r = Invoke-Health
+    if ($r -and $r.tls) { return "https://127.0.0.1:$($script:StatusPort)/" }
+    if ($r) { return "http://127.0.0.1:$($script:StatusPort)/" }
+  } catch {}
+  return "https://127.0.0.1:$($script:StatusPort)/"
+}
+
+function Invoke-StatusPost {
+  param([string]$Path)
+  $base = (Get-StatusBaseUrl).TrimEnd('/')
+  $uri = "$base/$Path"
+  try {
+    if ($uri.StartsWith('https')) {
+      return Invoke-RestMethod -Method POST -Uri $uri -ContentType 'application/json' -Body '{}' -SkipCertificateCheck
+    }
+    return Invoke-RestMethod -Method POST -Uri $uri -ContentType 'application/json' -Body '{}'
+  } catch {
+    return $null
+  }
+}
 
 function Start-AgentCore {
   if ($script:CoreProc -and -not $script:CoreProc.HasExited) { return }
@@ -45,10 +80,12 @@ function Stop-AgentCore {
 function Update-TrayTooltip {
   param([System.Windows.Forms.NotifyIcon]$Tray)
   try {
-    $r = Invoke-RestMethod -Uri "http://127.0.0.1:$($script:StatusPort)/health" -TimeoutSec 2
-    if ($r.paired) {
-      $label = if ($r.label) { $r.label } else { $r.deviceId }
+    $r = Invoke-Health
+    if ($r -and $r.paired) {
+      $label = if ($r.tenantName) { $r.tenantName } elseif ($r.label) { $r.label } else { $r.deviceId }
       $Tray.Text = "Ankara Yazılım Connector — Bağlı ($label)"
+    } elseif ($r -and $r.sessionPaused) {
+      $Tray.Text = 'Ankara Yazılım Connector — Oturum kapalı'
     } else {
       $Tray.Text = 'Ankara Yazılım Connector — Oturum bekleniyor'
     }
@@ -57,17 +94,18 @@ function Update-TrayTooltip {
   }
 }
 
-function Get-StatusBaseUrl {
-  try {
-    $r = Invoke-RestMethod -Uri "http://127.0.0.1:$($script:StatusPort)/health" -TimeoutSec 2
-    if ($r.tls) { return "https://127.0.0.1:$($script:StatusPort)/" }
-  } catch {}
-  return "http://127.0.0.1:$($script:StatusPort)/"
-}
-
 function Show-About {
+  $coreVer = '—'
+  try {
+    $r = Invoke-Health
+    if ($r.version) { $coreVer = $r.version }
+  } catch {}
   $body = @"
-Ankara Yazılım Connector $($script:Version)
+Ankara Yazılım Connector
+
+Tray sürümü: $($script:Version)
+Çekirdek sürümü: $coreVer
+İşletim sistemi: Windows
 
 Fiziksel donanımı Ankara Yazılım paneli ile köprüler.
 Tüm ayarlar web panelden yapılır.
@@ -83,12 +121,14 @@ https://ankarayazilim.org/indir
 }
 
 function Invoke-Logout {
+  Invoke-StatusPost -Path 'session/logout' | Out-Null
   Stop-AgentCore
-  if (Test-Path $script:CoreExe) {
-    $p = Start-Process -FilePath $script:CoreExe -ArgumentList 'logout' -WorkingDirectory $script:InstallDir -WindowStyle Hidden -PassThru
-    $p.WaitForExit(15000)
-  }
+  Start-Sleep -Milliseconds 300
   Start-AgentCore
+}
+
+function Invoke-Login {
+  $null = Invoke-StatusPost -Path 'session/login'
 }
 
 Start-AgentCore
@@ -104,8 +144,15 @@ Update-TrayTooltip -Tray $tray
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 $null = $menu.Items.Add('Durumu Aç', $null, { Start-Process (Get-StatusBaseUrl) })
-$null = $menu.Items.Add('Yerel sertifikayı güven…', $null, { Start-Process "$(Get-StatusBaseUrl)trust-cert" })
+$null = $menu.Items.Add('Yerel sertifikayı güven…', $null, {
+  $base = (Get-StatusBaseUrl).TrimEnd('/')
+  Start-Process "$base/trust-cert"
+})
+$null = $menu.Items.Add('Oturum aç…', $null, { Invoke-Login })
+$null = $menu.Items.Add('Güncellemeyi uygula…', $null, { Invoke-StatusPost -Path 'update/apply' | Out-Null })
 $null = $menu.Items.Add('Hakkında…', $null, { Show-About })
+$null = $menu.Items.Add('Gizlilik politikası…', $null, { Start-Process 'https://ankarayazilim.org/gizlilik/' })
+$null = $menu.Items.Add('KVKK aydınlatma…', $null, { Start-Process 'https://ankarayazilim.org/kvkk/' })
 $null = $menu.Items.Add('-')
 $null = $menu.Items.Add('Oturumu Kapat', $null, { Invoke-Logout; Update-TrayTooltip -Tray $tray })
 $null = $menu.Items.Add('-')

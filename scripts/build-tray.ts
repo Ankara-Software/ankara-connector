@@ -11,7 +11,7 @@ import { $ } from 'bun';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const VERSION = '1.1.5';
+const VERSION = '1.1.6';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const TRAY_DIR = join(ROOT, 'native', 'tray');
@@ -41,7 +41,7 @@ for (const t of goTargets) {
   try {
     const env = { ...process.env, CGO_ENABLED: '1', GOOS: t.goos, GOARCH: t.goarch };
     const args = ['go', 'build', '-o', outPath, '.'];
-    if (t.ldflags) args.splice(2, 0, `-ldflags=${t.ldflags}`);
+    if (t.ldflags) args.splice(2, 0, `-ldflags=${t.ldflags} -X main.version=${VERSION} -X main.build=local`);
     const child = Bun.spawn(args, { cwd: TRAY_DIR, env, stdout: 'inherit', stderr: 'inherit' });
     const code = await child.exited;
     if (code === 0 && existsSync(outPath)) {

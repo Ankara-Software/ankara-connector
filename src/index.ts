@@ -12,7 +12,8 @@
 
 import { spawn } from 'node:child_process';
 import { runAgent } from './agent';
-import { defaultConfig, loadConfig, saveConfig } from './config';
+import { loadConfig } from './config';
+import { logoutSession } from './session';
 import { stageUpdateIfAvailable, tryApplyStoredUpdate } from './update';
 import { CONNECTOR_VERSION } from './version';
 
@@ -35,14 +36,8 @@ async function main(): Promise<void> {
     }
 
     case 'logout': {
-      const cfg = loadConfig();
-      saveConfig({
-        ...defaultConfig(),
-        apiBase: cfg.apiBase,
-        statusPort: cfg.statusPort,
-        printer: cfg.printer,
-      });
-      console.log('Yerel oturum silindi. Connector’ı yeniden başlattığınızda tarayıcıda oturum açmanız istenecek.');
+      logoutSession();
+      console.log('Yerel oturum silindi. Oturum açmak için durum sayfasını veya tray menüsünü kullanın.');
       return;
     }
 

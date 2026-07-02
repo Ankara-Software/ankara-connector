@@ -7,10 +7,14 @@ const sample: AgentStatus = {
   paired: true,
   deviceId: 'dev-1',
   label: 'Connector',
+  tenantName: 'Demo A.Ş.',
+  pairedAt: '2026-07-01T12:00:00.000Z',
   apiBase: 'https://api.ankarayazilim.org/v1',
   capabilities: ['scanner.barcode', 'scanner.qr'],
   printer: null,
   startedAt: '2026-07-01T12:00:00.000Z',
+  version: '1.1.6',
+  sessionPaused: false,
 };
 
 describe('status-html', () => {
@@ -44,9 +48,24 @@ describe('status-html', () => {
     expect(html).not.toContain('/trust-cert');
   });
 
+  it('shows session section and logout when paired', () => {
+    const html = buildStatusHtml(sample, { tlsEnabled: true, certTrusted: true });
+    expect(html).toContain('Demo A.Ş.');
+    expect(html).toContain('Oturumu kapat');
+    expect(html).toContain("sessionAction('logout')");
+  });
+
+  it('shows login button when not paired', () => {
+    const html = buildStatusHtml(
+      { ...sample, paired: false, sessionPaused: true, tenantName: null, pairedAt: null },
+      { tlsEnabled: false, certTrusted: true },
+    );
+    expect(html).toContain("sessionAction('login')");
+    expect(html).toContain('Oturum kapalı');
+  });
+
   it('shows pair CTA when not paired', () => {
-    const html = buildStatusHtml({ ...sample, paired: false }, { tlsEnabled: false, certTrusted: true });
-    expect(html).toContain('Önce panelde oturum açın');
-    expect(html).toContain('connector/baglan');
+    const html = buildStatusHtml({ ...sample, paired: false, sessionPaused: false }, { tlsEnabled: false, certTrusted: true });
+    expect(html).toContain("sessionAction('login')");
   });
 });

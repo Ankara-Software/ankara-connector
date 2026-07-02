@@ -17,7 +17,7 @@ import { $ } from 'bun';
 import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
-const VERSION = '1.1.5';
+const VERSION = '1.1.6';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const STAGE = join(DIST, 'macos-stage');

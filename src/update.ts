@@ -14,6 +14,9 @@ import { configPath, loadConfig, saveConfig } from './config';
 import { CONNECTOR_VERSION } from './version';
 
 const CHECK_INTERVAL_MS = 1000 * 60 * 60 * 6;
+const WIN_TRAY_EXE = 'AnkaraYazilimConnector.exe';
+const WIN_CORE_EXE = 'ankara-connector-core.exe';
+const WIN_INSTALL_DIR = 'C:\\Program Files\\Ankara Yazilim\\Connector';
 
 export interface PendingUpdate {
   version: string;
@@ -43,6 +46,12 @@ export function connectorPlatformKey(): string {
   return 'linux-x64';
 }
 
+/** True when the staged artifact is the NSIS installer (not a raw core binary). */
+export function isWindowsSetupArtifact(pending: PendingUpdate): boolean {
+  const name = pending.filename.toLowerCase();
+  return name.includes('setup') || name.includes('ankaraconnector-setup');
+}
+
 function updatesDir(): string {
   const dir = join(require('node:path').dirname(configPath()), 'updates');
   mkdirSync(dir, { recursive: true });
@@ -69,7 +78,7 @@ async function sha256File(path: string): Promise<string> {
 
 export async function downloadPendingUpdate(
   apiBase: string,
-  current = CONNECTOR_VERSION
+  current = CONNECTOR_VERSION,
 ): Promise<PendingUpdate | null> {
   const json = await fetchUpdateCheck(apiBase, current);
   const data = json?.data;
@@ -102,7 +111,7 @@ export async function stageUpdateIfAvailable(cfg: ConnectorConfig): Promise<Pend
     const pending = await downloadPendingUpdate(cfg.apiBase);
     if (!pending) return null;
     saveConfig({ ...loadConfig(), pendingUpdate: pending });
-    console.log(`Güncelleme hazır: ${pending.version} (yeniden başlatınca uygulanır).`);
+    console.log(`Güncelleme hazır: ${pending.version} (uygulamak için yeniden başlatın veya tray menüsünü kullanın).`);
     return pending;
   } catch (e) {
     console.error('Güncelleme kontrolü:', (e as Error).message);
@@ -110,9 +119,17 @@ export async function stageUpdateIfAvailable(cfg: ConnectorConfig): Promise<Pend
   }
 }
 
-function writeWindowsApplyScript(targetExe: string, pendingPath: string): string {
+function writeWindowsCoreApplyScript(targetExe: string, pendingPath: string): string {
   const scriptPath = join(updatesDir(), 'apply-update.cmd');
-  const content = `@echo off\r\nping 127.0.0.1 -n 3 > nul\r\ncopy /Y "${pendingPath}" "${targetExe}"\r\nstart "" "${targetExe}" run\r\n del "%~f0"\r\n`;
+  const content = `@echo off\r\nping 127.0.0.1 -n 3 > nul\r\ntaskkill /F /IM ${WIN_TRAY_EXE} /T 2>nul\r\ntaskkill /F /IM ${WIN_CORE_EXE} /T 2>nul\r\ncopy /Y "${pendingPath}" "${targetExe}"\r\nstart "" "${join(WIN_INSTALL_DIR, WIN_TRAY_EXE)}"\r\ndel "%~f0"\r\n`;
+  writeFileSync(scriptPath, content, 'utf8');
+  return scriptPath;
+}
+
+function writeWindowsSetupApplyScript(pendingPath: string): string {
+  const scriptPath = join(updatesDir(), 'apply-update.cmd');
+  const trayPath = join(WIN_INSTALL_DIR, WIN_TRAY_EXE);
+  const content = `@echo off\r\ntaskkill /F /IM ${WIN_TRAY_EXE} /T 2>nul\r\ntaskkill /F /IM ${WIN_CORE_EXE} /T 2>nul\r\nping 127.0.0.1 -n 2 > nul\r\n"${pendingPath}" /S\r\nping 127.0.0.1 -n 2 > nul\r\nstart "" "${trayPath}"\r\ndel "%~f0"\r\n`;
   writeFileSync(scriptPath, content, 'utf8');
   return scriptPath;
 }
@@ -134,14 +151,17 @@ export async function applyPendingUpdate(pending: PendingUpdate): Promise<boolea
     return false;
   }
 
-  const targetExe = process.execPath;
-  const script =
-    process.platform === 'win32'
-      ? writeWindowsApplyScript(targetExe, pending.path)
-      : writeUnixApplyScript(targetExe, pending.path);
-
   const cfg = loadConfig();
   saveConfig({ ...cfg, pendingUpdate: null });
+
+  let script: string;
+  if (process.platform === 'win32' && isWindowsSetupArtifact(pending)) {
+    script = writeWindowsSetupApplyScript(pending.path);
+  } else if (process.platform === 'win32') {
+    script = writeWindowsCoreApplyScript(process.execPath, pending.path);
+  } else {
+    script = writeUnixApplyScript(process.execPath, pending.path);
+  }
 
   if (process.platform === 'win32') {
     spawn('cmd.exe', ['/c', script], { detached: true, stdio: 'ignore' }).unref();
@@ -167,4 +187,8 @@ export async function tryApplyStoredUpdate(): Promise<boolean> {
   const ok = await applyPendingUpdate(pending);
   if (ok) process.exit(0);
   return false;
+}
+
+export function pendingUpdateSummary(cfg: ConnectorConfig = loadConfig()): PendingUpdate | null {
+  return cfg.pendingUpdate ?? null;
 }

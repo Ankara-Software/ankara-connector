@@ -4,7 +4,7 @@
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
-!define APP_VERSION "1.1.5"
+!define APP_VERSION "1.1.6"
 !define APP_EXE "AnkaraYazilimConnector.exe"
 !define CORE_EXE "ankara-connector-core.exe"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\AnkaraYazilimConnector"
@@ -36,7 +36,18 @@ LangString STR_SECTION_CORE ${LANG_TURKISH} "Ana bileşenler"
 
 Name "$(STR_APP_NAME)"
 
+Function KillRunningConnector
+  ExecWait 'taskkill /F /IM ${APP_EXE} /T' $0
+  ExecWait 'taskkill /F /IM ${CORE_EXE} /T' $0
+  Sleep 500
+FunctionEnd
+
+Function .onInit
+  Call KillRunningConnector
+FunctionEnd
+
 Section "$(STR_SECTION_CORE)" SecCore
+  Call KillRunningConnector
   SetOutPath "$INSTDIR"
   File "..\..\dist\${APP_EXE}"
   File "..\..\dist\${CORE_EXE}"
@@ -60,7 +71,9 @@ Section "$(STR_SECTION_CORE)" SecCore
   CreateShortcut "$SMPROGRAMS\$(STR_STARTMENU)\$(STR_UNINSTALL).lnk" "$INSTDIR\Uninstall.exe"
   CreateShortcut "$SMSTARTUP\$(STR_APP_NAME).lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0
 
+  IfSilent silent_done
   Exec "$INSTDIR\${APP_EXE}"
+  silent_done:
 SectionEnd
 
 Section "Uninstall"
@@ -69,8 +82,7 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\$(STR_STARTMENU)\$(STR_UNINSTALL).lnk"
   RMDir "$SMPROGRAMS\$(STR_STARTMENU)"
 
-  ExecWait 'taskkill /F /IM ${APP_EXE} /T'
-  ExecWait 'taskkill /F /IM ${CORE_EXE} /T'
+  Call KillRunningConnector
 
   Delete "$INSTDIR\${APP_EXE}"
   Delete "$INSTDIR\${CORE_EXE}"
