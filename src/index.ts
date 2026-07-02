@@ -90,19 +90,21 @@ async function main(): Promise<void> {
     }
 
     case 'trust-cert': {
-      const { loadOrGenerateCert, writeTrustReadme, installCertToTrustStore } = await import('./tls-cert');
+      const { loadOrGenerateCert, trustLocalhostCert } = await import('./tls-cert');
+      console.log(
+        'Panelin bu bilgisayardaki yazıcı ve cihazlara güvenli bağlanması için yerel sertifika gerekir.',
+      );
       const cert = loadOrGenerateCert();
       if (!cert) {
         console.error('Sertifika üretilemedi (openssl kurulu mu?).');
         process.exit(3);
       }
-      writeTrustReadme();
-      const installed = installCertToTrustStore(cert.certPath);
+      const installed = trustLocalhostCert();
       console.log(`Yerel sertifika: ${cert.certPath}`);
       if (installed) {
         console.log('Sertifika işletim sistemi güven deposuna eklendi. Tarayıcı uyarısı olmaksızın wss:// kullanılabilir.');
       } else {
-        console.log('Otomatik güven eklenemedi (yönetici izni gerekebilir). README.txt içindeki adımları izleyin.');
+        console.log('Otomatik güven eklenemedi. Windows güvenlik uyarısında Evet deyin veya README.txt adımlarını izleyin.');
       }
       return;
     }

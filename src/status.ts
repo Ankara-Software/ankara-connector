@@ -8,10 +8,13 @@
 
 import { deliverAuthCallback, type AuthCallbackPayload } from './auth-flow';
 import { loadConfig, saveConfig, type PrinterConfig } from './config';
+import { TRAY_LOGO_PNG } from './generated/tray-logo';
 import { bufferDeviceEvent, bufferedEventCount, replayBufferedEvents } from './event-bridge';
 import { logLine } from './logger';
 import type { AckMessage, AgentInfo, Capability, CommandMessage, HelloMessage } from './protocol';
 import { decode, encode, makeAck, makeAckError, makeEvent, PROTOCOL_VERSION } from './protocol';
+import { buildStatusHtml, buildTrustCertResultHtml } from './status-html';
+import { isCertTrusted, trustLocalhostCert } from './tls-cert';
 
 /** Origins allowed to talk to the loopback API (roadmap §24, enterprise §1).
  *  Only the production panel + local dev servers may issue commands; a random
@@ -71,31 +74,6 @@ export function broadcastConnectorEvent(cap: Capability, event: string, payload?
     }
   }
 }
-
-const HTML = (s: AgentStatus) => `<!doctype html><html lang="tr"><head><meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Ankara Yazılım Connector</title>
-<style>
-  body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0b1220;color:#e6edf7;margin:0;padding:40px}
-  .card{max-width:640px;margin:0 auto;border:1px solid #1f2d44;border-radius:16px;padding:32px;background:#0f172a}
-  .brand{display:flex;align-items:center;gap:12px;margin-bottom:24px}
-  .brand img{height:40px;width:auto}
-  h1{font-size:20px;margin:0}
-  .row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #16203a;font-size:14px}
-  .row span:last-child{color:#9fb3cf;text-align:right}
-  .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:#13203a;border:1px solid #1f2d44;font-size:12px;margin:3px 4px 0 0}
-  .ok{color:#34d399}.warn{color:#fbbf24}
-</style></head><body><div class="card">
-  <div class="brand"><img src="https://ankarayazilim.org/ankara-yazilim.png" alt="Ankara Yazılım" width="160" height="40"/><h1>Connector</h1></div>
-  <div class="row"><span>Durum</span><span class="${s.paired ? 'ok' : 'warn'}">${s.paired ? 'Bağlı' : 'Oturum bekleniyor'}</span></div>
-  <div class="row"><span>Cihaz</span><span>${s.deviceId ?? '—'}</span></div>
-  <div class="row"><span>Etiket</span><span>${s.label ?? '—'}</span></div>
-  <div class="row"><span>Sunucu</span><span>${s.apiBase}</span></div>
-  <div class="row"><span>Yazıcı</span><span>${s.printer ? `${s.printer.host}:${s.printer.port}` : 'Panelden yapılandırın'}</span></div>
-  <div class="row"><span>Başlangıç</span><span>${s.startedAt}</span></div>
-  <div style="margin-top:16px"><strong style="font-size:13px">Yetenekler</strong><div style="margin-top:8px">
-    ${s.capabilities.map((c) => `<span class="pill">${c}</span>`).join('')}</div></div>
-</div></body></html>`;
 
 const AUTH_OK_HTML = `<!doctype html><html lang="tr"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -251,7 +229,27 @@ export function startStatusServer(
         return new Response(null, { status: 204, headers: corsHeaders });
       }
       if (url.pathname === '/health') {
-        return Response.json({ ok: true, ...status(), bufferedEvents: bufferedEventCount() }, { headers: corsHeaders });
+        return Response.json(
+          {
+            ok: true,
+            ...status(),
+            tls: !!tls,
+            certTrusted: tls ? isCertTrusted() : true,
+            bufferedEvents: bufferedEventCount(),
+          },
+          { headers: corsHeaders },
+        );
+      }
+      if (url.pathname === '/trust-cert' && req.method === 'GET') {
+        const ok = trustLocalhostCert();
+        return new Response(buildTrustCertResultHtml(ok), {
+          headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders },
+        });
+      }
+      if (url.pathname === '/assets/logo.png') {
+        return new Response(TRAY_LOGO_PNG, {
+          headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400', ...corsHeaders },
+        });
       }
       if (url.pathname === '/config/printer') {
         if (req.method === 'OPTIONS') {
@@ -308,9 +306,10 @@ export function startStatusServer(
         );
       }
       if (url.pathname === '/' || url.pathname === '/index.html') {
-        return new Response(HTML(status()), {
-          headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders },
-        });
+        return new Response(
+          buildStatusHtml(status(), { tlsEnabled: !!tls, certTrusted: tls ? isCertTrusted() : true }),
+          { headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders } },
+        );
       }
       if (server.upgrade(req)) return;
       return new Response('Not Found', { status: 404 });

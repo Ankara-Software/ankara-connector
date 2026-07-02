@@ -1,17 +1,15 @@
-; Ankara Yazılım Connector — Windows installer (Add/Remove Programs + startup tray)
+﻿; Ankara Yazılım Connector — Windows installer (Add/Remove Programs + startup tray)
+; Save this file as UTF-8 with BOM. Build with: makensis /INPUTCHARSET UTF8
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
-!define APP_NAME "Ankara Yazılım Connector"
-!define APP_PUBLISHER "Ankara Yazılım"
-!define APP_VERSION "1.1.2"
+!define APP_VERSION "1.1.3"
 !define APP_EXE "AnkaraYazilimConnector.exe"
 !define CORE_EXE "ankara-connector-core.exe"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\AnkaraYazilimConnector"
-!define INSTALL_DIR "$PROGRAMFILES64\Ankara Yazılım\Connector"
+!define INSTALL_DIR "$PROGRAMFILES64\Ankara Yazilim\Connector"
 
-Name "${APP_NAME}"
 OutFile "..\..\dist\AnkaraConnector-Setup-${APP_VERSION}.exe"
 InstallDir "${INSTALL_DIR}"
 RequestExecutionLevel admin
@@ -20,6 +18,7 @@ Unicode true
 !define MUI_ICON "..\assets\ankara-yazilim.ico"
 !define MUI_UNICON "..\assets\ankara-yazilim.ico"
 !define MUI_ABORTWARNING
+!define MUI_WELCOMEFINISHPAGE_BITMAP "..\assets\installer-sidebar.bmp"
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
@@ -29,17 +28,24 @@ Unicode true
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "Turkish"
 
-Section "Ana bileşenler" SecCore
+LangString STR_APP_NAME ${LANG_TURKISH} "Ankara Yazılım Connector"
+LangString STR_PUBLISHER ${LANG_TURKISH} "Ankara Yazılım"
+LangString STR_STARTMENU ${LANG_TURKISH} "Ankara Yazılım"
+LangString STR_UNINSTALL ${LANG_TURKISH} "Connector Kaldır"
+LangString STR_SECTION_CORE ${LANG_TURKISH} "Ana bileşenler"
+
+Name "$(STR_APP_NAME)"
+
+Section "$(STR_SECTION_CORE)" SecCore
   SetOutPath "$INSTDIR"
   File "..\..\dist\${APP_EXE}"
   File "..\..\dist\${CORE_EXE}"
   File "..\..\dist\ankara-yazilim.ico"
   File "..\..\dist\AnkaraYazilimConnector.ps1"
 
-  ; Add/Remove Programs
-  WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayName" "${APP_NAME}"
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayName" "$(STR_APP_NAME)"
   WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayVersion" "${APP_VERSION}"
-  WriteRegStr HKLM "${UNINSTALL_KEY}" "Publisher" "${APP_PUBLISHER}"
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "Publisher" "$(STR_PUBLISHER)"
   WriteRegStr HKLM "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKLM "${UNINSTALL_KEY}" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
   WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\${APP_EXE}"
@@ -49,23 +55,20 @@ Section "Ana bileşenler" SecCore
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-  ; Start menu + run at logon (tray)
-  CreateDirectory "$SMPROGRAMS\Ankara Yazılım"
-  CreateShortcut "$SMPROGRAMS\Ankara Yazılım\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0
-  CreateShortcut "$SMPROGRAMS\Ankara Yazılım\Connector Kaldır.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$SMSTARTUP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0
+  CreateDirectory "$SMPROGRAMS\$(STR_STARTMENU)"
+  CreateShortcut "$SMPROGRAMS\$(STR_STARTMENU)\$(STR_APP_NAME).lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0
+  CreateShortcut "$SMPROGRAMS\$(STR_STARTMENU)\$(STR_UNINSTALL).lnk" "$INSTDIR\Uninstall.exe"
+  CreateShortcut "$SMSTARTUP\$(STR_APP_NAME).lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0
 
-  ; Launch after install
   Exec "$INSTDIR\${APP_EXE}"
 SectionEnd
 
 Section "Uninstall"
-  Delete "$SMSTARTUP\${APP_NAME}.lnk"
-  Delete "$SMPROGRAMS\Ankara Yazılım\${APP_NAME}.lnk"
-  Delete "$SMPROGRAMS\Ankara Yazılım\Connector Kaldır.lnk"
-  RMDir "$SMPROGRAMS\Ankara Yazılım"
+  Delete "$SMSTARTUP\$(STR_APP_NAME).lnk"
+  Delete "$SMPROGRAMS\$(STR_STARTMENU)\$(STR_APP_NAME).lnk"
+  Delete "$SMPROGRAMS\$(STR_STARTMENU)\$(STR_UNINSTALL).lnk"
+  RMDir "$SMPROGRAMS\$(STR_STARTMENU)"
 
-  ; Stop running processes
   ExecWait 'taskkill /F /IM ${APP_EXE} /T'
   ExecWait 'taskkill /F /IM ${CORE_EXE} /T'
 
@@ -73,7 +76,7 @@ Section "Uninstall"
   Delete "$INSTDIR\${CORE_EXE}"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
-  RMDir "$PROGRAMFILES64\Ankara Yazılım"
+  RMDir "$PROGRAMFILES64\Ankara Yazilim"
 
   DeleteRegKey HKLM "${UNINSTALL_KEY}"
 SectionEnd

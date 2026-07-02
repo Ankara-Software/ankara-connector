@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { configPath } from './config';
+import { configPath, loadConfig, saveConfig } from './config';
 import { logLine } from './logger';
 
 export interface TlsCert {
@@ -97,6 +97,17 @@ export function writeTrustReadme(): void {
   );
 }
 
+function certPathFile(): string {
+  return join(tlsDir(), 'localhost.crt');
+}
+
+/** True when config marks the localhost cert as user-trusted and the file exists. */
+export function isCertTrusted(): boolean {
+  const cfg = loadConfig();
+  if (!cfg.tlsCertTrusted) return false;
+  return existsSync(certPathFile());
+}
+
 /** Install the localhost cert into the OS trust store so the HTTPS panel can
  *  reach `https://127.0.0.1:{port}` without browser warnings (roadmap §24,
  *  enterprise §1). Best-effort: requires admin/root on macOS/Linux; on Windows
@@ -135,8 +146,15 @@ export function installCertToTrustStore(certPath: string = certPathFile()): bool
   }
 }
 
-/** Internal: the cert file path (kept private to avoid name clash with the
- *  outer `certPath()` used for the TLS dir helper). */
-function certPathFile(): string {
-  return join(tlsDir(), 'localhost.crt');
+/** Opt-in: install cert to OS trust store and persist flag in config. */
+export function trustLocalhostCert(): boolean {
+  const cert = loadOrGenerateCert();
+  if (!cert) return false;
+  writeTrustReadme();
+  const ok = installCertToTrustStore(cert.certPath);
+  if (ok) {
+    const cfg = loadConfig();
+    saveConfig({ ...cfg, tlsCertTrusted: true });
+  }
+  return ok;
 }

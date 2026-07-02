@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$script:Version = '1.1.2'
+$script:Version = '1.1.3'
 $script:StatusPort = 4781
 $script:InstallDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $script:CoreExe = Join-Path $InstallDir 'ankara-connector-core.exe'
@@ -57,6 +57,14 @@ function Update-TrayTooltip {
   }
 }
 
+function Get-StatusBaseUrl {
+  try {
+    $r = Invoke-RestMethod -Uri "http://127.0.0.1:$($script:StatusPort)/health" -TimeoutSec 2
+    if ($r.tls) { return "https://127.0.0.1:$($script:StatusPort)/" }
+  } catch {}
+  return "http://127.0.0.1:$($script:StatusPort)/"
+}
+
 function Show-About {
   $body = @"
 Ankara Yazılım Connector $($script:Version)
@@ -95,7 +103,8 @@ $tray.Visible = $true
 Update-TrayTooltip -Tray $tray
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
-$null = $menu.Items.Add('Durumu Aç', $null, { Start-Process "http://127.0.0.1:$($script:StatusPort)/" })
+$null = $menu.Items.Add('Durumu Aç', $null, { Start-Process (Get-StatusBaseUrl) })
+$null = $menu.Items.Add('Yerel sertifikayı güven…', $null, { Start-Process "$(Get-StatusBaseUrl)trust-cert" })
 $null = $menu.Items.Add('Hakkında…', $null, { Show-About })
 $null = $menu.Items.Add('-')
 $null = $menu.Items.Add('Oturumu Kapat', $null, { Invoke-Logout; Update-TrayTooltip -Tray $tray })

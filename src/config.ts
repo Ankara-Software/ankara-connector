@@ -44,6 +44,8 @@ export interface ConnectorConfig {
   /** Opt-in cloud crash reporting (roadmap §39). Default off; only metadata
    *  (version, OS, stack hash) is ever sent — never device/business data. */
   crashReporting?: boolean;
+  /** User opted in to trust the localhost TLS cert in the OS store. */
+  tlsCertTrusted?: boolean;
 }
 
 export interface PrinterConfig {

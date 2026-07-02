@@ -23,20 +23,35 @@ import (
 var iconData []byte
 
 const (
-	version    = "1.1.2"
+	version    = "1.1.3"
 	statusPort = 4781
-	statusURL  = "http://127.0.0.1:4781/"
 )
+
+type healthPayload struct {
+	Paired      bool   `json:"paired"`
+	DeviceID    string `json:"deviceId"`
+	Label       string `json:"label"`
+	TLS         bool   `json:"tls"`
+	CertTrusted bool   `json:"certTrusted"`
+}
 
 var (
 	coreMu   sync.Mutex
 	coreProc *exec.Cmd
 )
 
-type healthPayload struct {
-	Paired   bool   `json:"paired"`
-	DeviceID string `json:"deviceId"`
-	Label    string `json:"label"`
+func statusPageURL() string {
+	scheme := "http"
+	client := http.Client{Timeout: 2 * time.Second}
+	res, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/health", statusPort))
+	if err == nil {
+		defer res.Body.Close()
+		var h healthPayload
+		if json.NewDecoder(res.Body).Decode(&h) == nil && h.TLS {
+			scheme = "https"
+		}
+	}
+	return fmt.Sprintf("%s://127.0.0.1:%d/", scheme, statusPort)
 }
 
 func main() {
@@ -53,6 +68,7 @@ func onReady() {
 	}
 
 	mOpen := systray.AddMenuItem("Durumu Aç", "Tarayıcıda durum sayfasını aç")
+	mTrust := systray.AddMenuItem("Yerel sertifikayı güven…", "Panel için yerel TLS sertifikasını onayla")
 	mAbout := systray.AddMenuItem("Hakkında…", "Sürüm bilgisi")
 	systray.AddSeparator()
 	mLogout := systray.AddMenuItem("Oturumu Kapat", "Yerel oturumu sıfırla")
@@ -64,7 +80,9 @@ func onReady() {
 		for {
 			select {
 			case <-mOpen.ClickedCh:
-				openBrowser(statusURL)
+				openBrowser(statusPageURL())
+			case <-mTrust.ClickedCh:
+				openBrowser(statusPageURL() + "trust-cert")
 			case <-mAbout.ClickedCh:
 				showAbout()
 			case <-mLogout.ClickedCh:

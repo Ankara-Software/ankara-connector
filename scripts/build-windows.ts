@@ -5,7 +5,7 @@ import { copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { rcedit } from 'rcedit';
 
-const VERSION = '1.1.2';
+const VERSION = '1.1.3';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const ASSETS = join(ROOT, 'windows', 'assets');
@@ -80,7 +80,7 @@ if (existsSync(trayExe)) {
 if (which('makensis')) {
   console.log('Building NSIS installer…');
   try {
-    await $`makensis /V2 connector.nsi`.cwd(join(ROOT, 'windows', 'installer'));
+    await $`makensis /INPUTCHARSET UTF8 /V2 connector.nsi`.cwd(join(ROOT, 'windows', 'installer'));
   } catch (e) {
     console.warn('NSIS build failed:', (e as Error).message);
   }

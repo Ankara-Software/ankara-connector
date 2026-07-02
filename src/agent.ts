@@ -48,7 +48,7 @@ export async function runAgent(): Promise<void> {
   // Loopback server must start before web auth (browser POSTs token here).
   // TLS is default-on (roadmap §24, enterprise §1): the HTTPS panel cannot
   // speak plain ws:// to a loopback endpoint without mixed-content errors, so
-  // we serve wss:// and install the self-signed cert into the OS trust store.
+  // we serve wss://; the user opts in via tray or status page (trust-cert).
   // A user can opt out with `tls: false` in config.json.
   let tlsCfg: { cert: string; key: string } | null = null;
   if (cfg.tls !== false) {
@@ -56,11 +56,6 @@ export async function runAgent(): Promise<void> {
     if (cert) {
       tlsCfg = { cert: cert.cert, key: cert.key };
       writeTrustReadme();
-      // Best-effort: add the cert to the OS trust store so the browser trusts
-      // https://127.0.0.1:{port}. Failure is non-fatal (agent keeps serving
-      // wss:// with an untrusted cert; the panel can still pin it).
-      const { installCertToTrustStore } = await import('./tls-cert');
-      installCertToTrustStore(cert.certPath);
       logLine('info', `Loopback TLS etkin (wss://127.0.0.1:${cfg.statusPort}). Sertifika: ${cert.certPath}`);
     } else {
       logLine('warn', 'TLS istendi ama sertifika üretilemedi (openssl yok?) — ws:// ile devam ediliyor.');
