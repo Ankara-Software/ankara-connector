@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 connector-config = { path = "../connector-config" }
 connector-cloud = { path = "../connector-cloud" }
+anyhow = { workspace = true }
 log = { workspace = true }
 tray-icon = "0.19"
 muda = "0.15"

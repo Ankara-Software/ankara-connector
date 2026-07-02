@@ -29,7 +29,7 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
 
     update_visibility(&login, &logout);
 
-    let icon = tray_icon::Icon::from_path("ankara-yazilim.ico").ok();
+    let icon = tray_icon::Icon::from_path("ankara-yazilim.ico", None).ok();
     let mut builder = TrayIconBuilder::new().with_menu(Box::new(menu.clone()));
     if let Some(icon) = icon {
         builder = builder.with_icon(icon);
@@ -74,8 +74,8 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
 
 fn update_visibility(login: &MenuItem, logout: &MenuItem) {
     let paired = is_paired(&load_config());
-    let _ = login.set_visible(!paired);
-    let _ = logout.set_visible(paired);
+    login.set_enabled(!paired);
+    logout.set_enabled(paired);
 }
 
 fn update_tooltip(tray: &TrayIcon) {
