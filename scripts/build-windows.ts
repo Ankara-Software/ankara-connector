@@ -5,7 +5,7 @@ import { copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { rcedit } from 'rcedit';
 
-const VERSION = '1.1.6';
+const VERSION = '1.1.7';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const ASSETS = join(ROOT, 'windows', 'assets');

@@ -13,7 +13,7 @@ const sample: AgentStatus = {
   capabilities: ['scanner.barcode', 'scanner.qr'],
   printer: null,
   startedAt: '2026-07-01T12:00:00.000Z',
-  version: '1.1.6',
+  version: '1.1.7',
   sessionPaused: false,
 };
 

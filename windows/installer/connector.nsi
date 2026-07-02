@@ -4,7 +4,7 @@
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
-!define APP_VERSION "1.1.6"
+!define APP_VERSION "1.1.7"
 !define APP_EXE "AnkaraYazilimConnector.exe"
 !define CORE_EXE "ankara-connector-core.exe"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\AnkaraYazilimConnector"
@@ -36,18 +36,18 @@ LangString STR_SECTION_CORE ${LANG_TURKISH} "Ana bileşenler"
 
 Name "$(STR_APP_NAME)"
 
-Function KillRunningConnector
-  ExecWait 'taskkill /F /IM ${APP_EXE} /T' $0
-  ExecWait 'taskkill /F /IM ${CORE_EXE} /T' $0
+!macro KillConnectorProcesses
+  ExecWait 'taskkill /F /IM ${APP_EXE} /T'
+  ExecWait 'taskkill /F /IM ${CORE_EXE} /T'
   Sleep 500
-FunctionEnd
+!macroend
 
 Function .onInit
-  Call KillRunningConnector
+  !insertmacro KillConnectorProcesses
 FunctionEnd
 
 Section "$(STR_SECTION_CORE)" SecCore
-  Call KillRunningConnector
+  !insertmacro KillConnectorProcesses
   SetOutPath "$INSTDIR"
   File "..\..\dist\${APP_EXE}"
   File "..\..\dist\${CORE_EXE}"
@@ -82,7 +82,7 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\$(STR_STARTMENU)\$(STR_UNINSTALL).lnk"
   RMDir "$SMPROGRAMS\$(STR_STARTMENU)"
 
-  Call KillRunningConnector
+  !insertmacro KillConnectorProcesses
 
   Delete "$INSTDIR\${APP_EXE}"
   Delete "$INSTDIR\${CORE_EXE}"
