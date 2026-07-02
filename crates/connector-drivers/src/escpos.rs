@@ -67,7 +67,7 @@ pub fn encode_job(job: &PrintJob) -> Vec<u8> {
         );
     }
     for line in &job.lines {
-        emit(out, line);
+        emit(&mut out, line);
     }
     if let Some(f) = &job.footer {
         emit(
