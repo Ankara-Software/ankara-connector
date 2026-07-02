@@ -1,13 +1,12 @@
 //! Ankara Yazılım Connector v2 — single Rust binary, cloud relay.
 
-// Release builds: GUI-only (no console window on Windows).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod instance;
 
 use anyhow::Result;
 use connector_cloud::{run_agent_loop, run_heartbeat_loop, start_login_flow};
-use connector_config::{is_paired, load_config};
+use connector_config::{is_paired, load_config, pending_pair_valid};
 use connector_tray::{notify_login_result, run_tray, TrayActions};
 use connector_update::{start_auto_update_loop, try_apply_stored_update};
 use instance::{claim_single_instance, handle_duplicate_launch, terminate_legacy_connectors, InstanceClaim};
@@ -22,7 +21,7 @@ async fn main() -> Result<()> {
 
     match claim_single_instance()? {
         InstanceClaim::AlreadyRunning => {
-            info!("Connector zaten çalışıyor — panel açılıyor.");
+            info!("Connector zaten çalışıyor.");
             handle_duplicate_launch();
             return Ok(());
         }
@@ -76,6 +75,8 @@ async fn main() -> Result<()> {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         let cfg = load_config();
         if !is_paired(&cfg) && !cfg.session_paused {
+            let _ = auto_login_tx.send(());
+        } else if pending_pair_valid(&cfg) {
             let _ = auto_login_tx.send(());
         }
     });

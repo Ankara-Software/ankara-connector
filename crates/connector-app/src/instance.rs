@@ -1,7 +1,6 @@
 //! Single-instance guard — enterprise agents must not spawn duplicate tray icons.
 
 use anyhow::Result;
-use connector_cloud::management_panel_url;
 use log::warn;
 
 const MUTEX_NAME: &str = "Global\\AnkaraYazilimConnector.v2";
@@ -27,20 +26,26 @@ impl Drop for InstanceGuard {
     }
 }
 
-/// Terminate legacy v1 tray/core processes so only one Connector icon remains.
+/// Terminate other Connector processes (legacy + duplicate v2) except this PID.
 pub fn terminate_legacy_connectors() {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        for exe in ["AnkaraYazilimConnector.exe", "ankara-connector-core.exe"] {
+        let pid = std::process::id();
+        let filter = format!("PID ne {pid}");
+        for exe in [
+            "AnkaraConnector.exe",
+            "AnkaraYazilimConnector.exe",
+            "ankara-connector-core.exe",
+        ] {
             let status = std::process::Command::new("taskkill")
-                .args(["/F", "/IM", exe, "/T"])
+                .args(["/F", "/IM", exe, "/FI", &filter, "/T"])
                 .creation_flags(CREATE_NO_WINDOW)
                 .status();
             if let Ok(s) = status {
                 if s.success() {
-                    warn!("Legacy Connector sonlandırıldı: {exe}");
+                    warn!("Connector süreci sonlandırıldı: {exe}");
                 }
             }
         }
@@ -94,8 +99,11 @@ pub fn claim_single_instance() -> Result<InstanceClaim> {
     }
 }
 
-/// Second launch: open panel in browser and exit quietly.
+/// Second launch: inform user; do not open browser (avoids login tab loop).
 pub fn handle_duplicate_launch() {
-    let url = management_panel_url();
-    let _ = open::that(&url);
+    connector_tray::about::show_message(
+        "Ankara Yazılım Connector",
+        "Connector zaten çalışıyor. Tepsi simgesinden yönetebilirsiniz.",
+        false,
+    );
 }
