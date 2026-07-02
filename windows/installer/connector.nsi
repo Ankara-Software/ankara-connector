@@ -4,9 +4,10 @@
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
-!define APP_VERSION "1.1.8"
-!define APP_EXE "AnkaraYazilimConnector.exe"
-!define CORE_EXE "ankara-connector-core.exe"
+!define APP_VERSION "2.0.0"
+!define APP_EXE "AnkaraConnector.exe"
+!define LEGACY_TRAY "AnkaraYazilimConnector.exe"
+!define LEGACY_CORE "ankara-connector-core.exe"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\AnkaraYazilimConnector"
 !define INSTALL_DIR "$PROGRAMFILES64\Ankara Yazilim\Connector"
 
@@ -38,7 +39,8 @@ Name "$(STR_APP_NAME)"
 
 !macro KillConnectorProcesses
   ExecWait 'taskkill /F /IM ${APP_EXE} /T'
-  ExecWait 'taskkill /F /IM ${CORE_EXE} /T'
+  ExecWait 'taskkill /F /IM ${LEGACY_TRAY} /T'
+  ExecWait 'taskkill /F /IM ${LEGACY_CORE} /T'
   Sleep 500
 !macroend
 
@@ -50,9 +52,7 @@ Section "$(STR_SECTION_CORE)" SecCore
   !insertmacro KillConnectorProcesses
   SetOutPath "$INSTDIR"
   File "..\..\dist\${APP_EXE}"
-  File "..\..\dist\${CORE_EXE}"
   File "..\..\dist\ankara-yazilim.ico"
-  File "..\..\dist\AnkaraYazilimConnector.ps1"
 
   WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayName" "$(STR_APP_NAME)"
   WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayVersion" "${APP_VERSION}"
@@ -85,7 +85,9 @@ Section "Uninstall"
   !insertmacro KillConnectorProcesses
 
   Delete "$INSTDIR\${APP_EXE}"
-  Delete "$INSTDIR\${CORE_EXE}"
+  Delete "$INSTDIR\${LEGACY_TRAY}"
+  Delete "$INSTDIR\${LEGACY_CORE}"
+  Delete "$INSTDIR\ankara-yazilim.ico"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
   RMDir "$PROGRAMFILES64\Ankara Yazilim"

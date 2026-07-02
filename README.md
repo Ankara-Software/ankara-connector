@@ -1,82 +1,116 @@
 # Ankara Yazılım Connector
 
-Ankara Yazılım panellerini fiziksel donanımla köprüleyen, arka planda çalışan
-**headless** agent. Windows, macOS ve Linux için tek dosyalık çalıştırılabilir
-ikili olarak dağıtılır; kurulum sonrası tüm yönetim web panelden yapılır.
 
-> Durum: **v1.1.0**. Web oturum açma akışı, termal fiş yazıcı (ESC/POS), barkod/QR
-> olayları ve cihaz yönetimi canlı. Nitelikli e-imza (NES), ödeme cihazı, biyometrik
-> ve mobil (Android/iOS) derlemeleri **yakında** (operatör/SDK bağımlı).
 
-## Ne yapar
+Ankara Yazılım panellerini fiziksel donanımla köprüleyen arka plan agent'ı.
 
-- **Web oturum açma** — uygulamayı çalıştırınca tarayıcıda Ankara Yazılım oturum
-  açma sayfası açılır; bir kez giriş yapınca oturum kalıcı olarak hatırlanır.
-- **Termal fiş yazıcı** — ESC/POS komutlarını ağ yazıcısına (port 9100) ham TCP ile
-  gönderir.
-- **Etiket/barkod yazıcı** — aynı ESC/POS kanalı üzerinden etiket basımı.
-- **Para çekmecesi** — yazıcı üzerinden çekmece pulse gönderir.
-- **Barkod/QR olayları** — tarayıcıdan gelen kodları panele olay olarak iletir.
-- **Yerel durum sunucusu** — `http://127.0.0.1:4781` üzerinde minimal durum sayfası
-  ve `ws://127.0.0.1:4781` üzerinde panelin komut gönderdiği loopback WebSocket.
 
-## Kurulum (son kullanıcı)
 
-1. [Releases](https://github.com/Ankara-Software/ankara-connector/releases) sayfasından
-   platformunuza uygun ikiliyi indirin.
-2. İkiliyi çalıştırın (Windows `.exe`, macOS arm64/x64, Linux x64).
-3. Tarayıcıda açılan **Connector oturum aç** sayfasında Ankara Yazılım hesabınızla
-   giriş yapın ve **Bu bilgisayarı bağla** deyin.
-4. Oturum kalıcıdır — Connector kim olduğunuzu ve hangi firmaya bağlı olduğunuzu
-   hatırlar. Cihaz ayarlarını web panelden yönetin.
+> **v2.0.0** — Tek Rust binary (`AnkaraConnector.exe`), cloud WSS relay (`api.ankarayazilim.org`),
 
-Terminal veya eşleştirme kodu gerekmez.
+> native tray (Hakkında, oturum aç/kapat). Localhost TLS / port 4781 loopback kaldırıldı.
 
-## CLI (bakım)
+
+
+## Mimari (v2)
+
+
 
 ```
-ankara-connector              Başlat (varsayılan)
-ankara-connector logout       Yerel oturumu sıfırla
-ankara-connector status       Yapılandırmayı göster
-ankara-connector version      Sürümü göster
-ankara-connector install-daemon [--silent]   Arka plan hizmeti olarak kur
-ankara-connector uninstall-daemon            Arka plan hizmetini kaldır
-ankara-connector watchdog      Agent’ı denetle, çökünce yeniden başlat
-ankara-connector trust-cert    Yerel TLS sertifikası üret + güven rehberi
-ankara-connector update-check  Doğrulanmış güncelleme kontrolü
-```
 
-Yapılandırma: `~/.ankara-connector/config.json` (yerel, 0600). Cihaz belirteci
-OS anahtarlığında (macOS Keychain / Windows Credential Manager / dosya) saklanır.
+Panel → HTTPS → api.ankarayazilim.org (/v1/connector/command)
 
-## Operatör-bağımlı (blocked) yetenekler
+Agent → WSS outbound → api.ankarayazilim.org (/v1/connector/agent)
 
-Aşağıdaki yeteneklerin agent tarafı sözleşmeleri + mock sağlayıcıları hazırdır;
-gerçek donanım/SDK operatör unblock’unu bekler:
-
-- **Nitelikli e-imza (NES, PKCS#11)** — `src/esign.ts` (`EsignProvider`).
-  Akis/e-Tuğra PKCS#11 kütüphanesi + kart sağlanması gerekiyor.
-- **ÖKC / Ödeme cihazı** — `src/payment-device.ts` (`PaymentDeviceProvider`).
-  GİB onaylı vendor SDK + banka kimlik bilgileri gerekiyor.
-- **Biyometrik (parmak izi/iris)** — `src/biometric.ts` (`BiometricProvider`).
-  ZKTeco/Suprema SDK lisansı gerekiyor.
-- **EV code signing + MSI/PKG/deb + Android/iOS store** — p298-connector-code-signing
-  ve p298-connector-mobile ile operatör takip ediliyor.
-
-## Geliştirme
+Agent → ESC/POS / drawer / scanner → yerel donanım
 
 ```
-bun install
-bun run src/index.ts            # doğrudan çalıştır
-bun run scripts/build.ts        # tüm desktop hedeflerini dist/'e derle
-bun test
+
+
+
+Oturum açma: tray **Oturum aç** → tarayıcı `/connector/baglan` → agent `pair-result` poll.
+
+
+
+## Rust workspace
+
+
+
 ```
 
-## Sürümleme
+crates/
 
-`git tag v*` push → `release.yml` on s31 (cross-compile windows/macos-arm64/macos-x64/linux)
-üzerinde derler ve GitHub Release'e ikili + `sha256sums.txt` olarak yükler.
+  connector-app/       # AnkaraConnector.exe (main)
+
+  connector-cloud/     # WSS, heartbeat, web-pair poll
+
+  connector-tray/      # systray + native About (Windows MessageBox)
+
+  connector-drivers/   # printer.escpos, drawer.kick, scanner.*
+
+  connector-config/    # ~/.ankara-connector + OS keyring
+
+  connector-protocol/  # wire messages
+
+```
+
+
+
+## Derleme
+
+
+
+**Windows (s18 CI veya MSVC ortamı):**
+
+
+
+```bash
+
+bun run build:windows    # cargo release + NSIS installer
+
+```
+
+
+
+**Geliştirme:**
+
+
+
+```bash
+
+cargo build -p connector-app
+
+cargo test
+
+```
+
+
+
+> Git Bash'te GNU `link.exe` MSVC ile çakışabilir — Windows'ta `cmd` veya Visual Studio
+
+> Developer Prompt kullanın; CI s18'de Rust toolchain kurulu.
+
+
+
+## v1 emeklilik
+
+
+
+`ankara-connector-core.exe` (Bun) + `AnkaraYazilimConnector.exe` (Go tray) v2.0.0 ile
+
+Windows dağıtımından kaldırıldı. macOS/Linux geçici olarak Bun 2.0.0 ikilileri; Rust shell
+
+sonrası tek binary olacak.
+
+
+
+Eski kaynak: `src/` (Bun agent, arşiv).
+
+
 
 ## Lisans
 
+
+
 MIT — Ankara Yazılım.
+

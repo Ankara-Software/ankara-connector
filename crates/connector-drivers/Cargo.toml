@@ -1,0 +1,13 @@
+[package]
+name = "connector-drivers"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+connector-config = { path = "../connector-config" }
+connector-protocol = { path = "../connector-protocol" }
+log = { workspace = true }

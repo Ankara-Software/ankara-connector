@@ -1,0 +1,17 @@
+[package]
+name = "connector-app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "AnkaraConnector"
+path = "src/main.rs"
+
+[dependencies]
+connector-config = { path = "../connector-config" }
+connector-cloud = { path = "../connector-cloud" }
+connector-tray = { path = "../connector-tray" }
+tokio = { workspace = true }
+log = { workspace = true }
+env_logger = "0.11"
+anyhow = { workspace = true }

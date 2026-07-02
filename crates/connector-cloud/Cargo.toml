@@ -1,0 +1,19 @@
+[package]
+name = "connector-cloud"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+futures-util = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+uuid = { workspace = true }
+connector-config = { path = "../connector-config" }
+connector-protocol = { path = "../connector-protocol" }
+connector-drivers = { path = "../connector-drivers" }
+open = "5"

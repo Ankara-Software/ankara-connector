@@ -1,0 +1,16 @@
+[package]
+name = "connector-tray"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+connector-config = { path = "../connector-config" }
+connector-cloud = { path = "../connector-cloud" }
+log = { workspace = true }
+tray-icon = "0.19"
+muda = "0.15"
+tokio = { workspace = true }
+open = "5"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging"] }

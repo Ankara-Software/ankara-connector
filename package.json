@@ -1,6 +1,6 @@
 {
   "name": "ankara-connector",
-  "version": "1.1.8",
+  "version": "2.0.0",
   "description": "Ankara Yazılım Connector — fiziksel donanımı panellerle köprüleyen headless agent.",
   "type": "module",
   "private": true,
@@ -8,7 +8,9 @@
     "ankara-connector": "src/index.ts"
   },
   "scripts": {
-    "build": "bun run scripts/build.ts",
+    "build": "cargo build --release -p connector-app",
+    "build:windows": "bun run scripts/build-windows.ts",
+    "build:legacy": "bun run scripts/build.ts",
     "start": "bun run src/index.ts run",
     "pair": "bun run src/index.ts pair",
     "test": "bun test",

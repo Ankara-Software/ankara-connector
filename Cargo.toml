@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/connector-protocol",
+  "crates/connector-config",
+  "crates/connector-cloud",
+  "crates/connector-drivers",
+  "crates/connector-tray",
+  "crates/connector-app",
+]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2021"
+license = "Proprietary"
+authors = ["Ankara Yazılım"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+uuid = { version = "1", features = ["v4"] }
+log = "0.4"
+anyhow = "1"
+thiserror = "1"
