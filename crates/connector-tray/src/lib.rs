@@ -3,4 +3,4 @@
 mod about;
 mod menu;
 
-pub use menu::run_tray;
+pub use menu::{notify_login_result, run_tray, TrayActions};
