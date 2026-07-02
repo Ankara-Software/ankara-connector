@@ -2,10 +2,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use connector_config::{load_config, save_config, ConnectorConfig};
+use connector_config::{load_config, ConnectorConfig};
 use connector_drivers::advertised_capabilities;
 use futures_util::{SinkExt, StreamExt};
-use log::{error, info, warn};
+use log::{info, warn};
 use serde_json::Value;
 use tokio::sync::RwLock;
 use tokio_tungstenite::{connect_async, tungstenite::Message};

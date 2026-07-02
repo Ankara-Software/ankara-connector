@@ -3,4 +3,4 @@
 mod escpos;
 mod host;
 
-pub use host::{dispatch_command, advertised_capabilities, DriverHost};
+pub use host::{dispatch_command, dispatch_command_with_id, advertised_capabilities, DriverHost};
