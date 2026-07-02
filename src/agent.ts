@@ -7,6 +7,7 @@ import { cancelAllPendingAuth, waitForWebAuth } from './auth-flow';
 import { loadConfig, saveConfig } from './config';
 import { installCrashHandlers } from './crash-report';
 import { buildDriverHost } from './drivers/host';
+import { warmEsignDetection } from './esign-discover';
 import { startHeartbeatLoop } from './heartbeat';
 import { logLine } from './logger';
 import { advertisedCapabilities, agentInfo, rotateToken } from './pair';
@@ -42,6 +43,7 @@ export async function runAgent(): Promise<void> {
   // Command routing is delegated to the DriverHost registry (Open/Closed):
   // the status server asks host.handlerFor(cap); each registered driver owns
   // its own handler. New hardware = register a driver, no router edits.
+  await warmEsignDetection();
   const host = buildDriverHost();
   const handler = (cap: Capability) => host.handlerFor(cap);
 

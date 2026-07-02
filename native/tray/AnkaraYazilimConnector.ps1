@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$script:Version = '1.1.3'
+$script:Version = '1.1.4'
 $script:StatusPort = 4781
 $script:InstallDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $script:CoreExe = Join-Path $InstallDir 'ankara-connector-core.exe'

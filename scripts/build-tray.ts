@@ -11,7 +11,7 @@ import { $ } from 'bun';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const VERSION = '1.1.3';
+const VERSION = '1.1.4';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const TRAY_DIR = join(ROOT, 'native', 'tray');

@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { defaultConfig, setConfigOverride } from '../config';
+import { invalidateEsignTokenCache } from '../esign-discover';
 import { decodeModbusFrame } from '../modbus';
 import type { CommandMessage } from '../protocol';
 import { verifySignageFrame } from '../signage';
@@ -87,18 +91,44 @@ describe('display driver (pole display, loopback)', () => {
 });
 
 describe('esign driver', () => {
-  test('list tokens returns mock when pkcs11lib absent', async () => {
+  let dllDir: string;
+  let dllPath: string;
+
+  beforeEach(() => {
+    dllDir = mkdtempSync(join(tmpdir(), 'esign-drv-'));
+    dllPath = join(dllDir, 'mock.dll');
+    writeFileSync(dllPath, 'mock');
+    invalidateEsignTokenCache();
+  });
+
+  afterEach(() => {
+    invalidateEsignTokenCache();
+    try {
+      rmSync(dllDir, { recursive: true, force: true });
+    } catch {}
+  });
+
+  test('list tokens returns mock when pkcs11lib absent and no hardware', async () => {
     setConfigOverride({ ...defaultConfig(), esign: { pkcs11Lib: '' } });
+    if (process.platform === 'win32') return;
     const r = await esignDriver.handle(cmd('signature.esign', 'list'));
     expect(r.error).toBeUndefined();
     const p = r.payload as { tokens: { id: string }[] };
     expect(p.tokens.length).toBeGreaterThan(0);
   });
 
-  test('not configured when esign missing', async () => {
+  test('sign requires configuration on non-Windows without lib', async () => {
+    if (process.platform === 'win32') return;
     setConfigOverride(defaultConfig());
-    const r = await esignDriver.handle(cmd('signature.esign', 'list'));
+    const r = await esignDriver.handle(
+      cmd('signature.esign', 'sign', { pin: '1234', base64: btoa('test') }),
+    );
     expect(r.error?.code).toBe('E25');
+  });
+
+  test('isAvailable when pkcs11Lib path exists', () => {
+    setConfigOverride({ ...defaultConfig(), esign: { pkcs11Lib: dllPath } });
+    expect(esignDriver.isAvailable()).toBe(true);
   });
 });
 
@@ -124,6 +154,10 @@ describe('opos bridge', () => {
 
 describe('DriverHost advertises wired protocol capabilities', () => {
   test('all protocol drivers are registered', () => {
+    const dllDir = mkdtempSync(join(tmpdir(), 'esign-host-'));
+    const dllPath = join(dllDir, 'mock.dll');
+    writeFileSync(dllPath, 'mock');
+    try {
     setConfigOverride({
       ...defaultConfig(),
       printer: { host: 'p', port: 9100 },
@@ -134,8 +168,9 @@ describe('DriverHost advertises wired protocol capabilities', () => {
       display: { kind: 'serial', endpoint: 'COM3' },
       wiegand: { vidPid: '0001:0001' },
       biometric: { plugin: 'mock' },
-      esign: { pkcs11Lib: '' },
+      esign: { pkcs11Lib: dllPath },
     });
+    invalidateEsignTokenCache();
     const host = buildDriverHost();
     const caps = host.advertisedCapabilities();
     expect(caps).toContain('scanner.barcode');
@@ -150,6 +185,9 @@ describe('DriverHost advertises wired protocol capabilities', () => {
     expect(caps).toContain('signature.esign');
     expect(caps).toContain('camera.onvif');
     expect(caps).toContain('payment.device');
+    } finally {
+      rmSync(dllDir, { recursive: true, force: true });
+    }
   });
 });
 

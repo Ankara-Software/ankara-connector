@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ENTRY = 'src/index.ts';
-const VERSION = '1.1.3';
+const VERSION = '1.1.4';
 
 interface Target {
   id: string;

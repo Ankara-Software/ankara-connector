@@ -1,23 +1,22 @@
 // PKCS#11 / NES e-imza client (roadmap §16).
 //
-// Real PKCS#11 implementation that lazy-loads the `pkcs11js` native binding and
-// talks to any PKCS#11 shared library — SoftHSM2 (software HSM, used for tests
-// and dev) or a real USB token (Akis, e-Tuğra, U-NET) via the same code path.
-// When `pkcs11js` is not installed, falls back to the mock provider so the
-// contract stays testable. The PIN is never stored — it arrives in the panel
-// command payload and is used only for the duration of the sign call (KVKK item
-// 26: e-imza PIN never leaves the host).
+// Lazy-loads `pkcs11js` (or bundled `pkcs11.node`) and talks to vendor PKCS#11
+// libraries. When PKCS#11 is unavailable, falls back to Windows certificate
+// store enumeration so plugged smart cards are still visible.
 
+import { discoverPkcs11Lib, listWindowsEsignTokens, pkcs11NativePath } from './esign-discover';
 import type { EsignDocument, EsignProvider, EsignResult } from './esign';
 import { MockEsignProvider } from './esign';
-import { loadNativeModule } from './transports/native-loader';
+import { createWindowsCertProviderIfTokens } from './esign-windows';
+import { logLine } from './logger';
+import { loadNativeModule, type NativeModuleResult } from './transports/native-loader';
 
 interface Pkcs11Api {
   default: {
     new (): {
       load(path: string, pin?: string): void;
       openSession(slotId: number, flags: number): { login(pin: string): void; logout(): void; close(): void };
-      slots(): { slotId: number; slotDescription: string }[];
+      slots(): { slotId: number; slotDescription: string; token?: unknown }[];
       signInit(session: unknown, mechanism: { mechanism: number }): void;
       sign(session: unknown, data: Buffer): Buffer;
       digest(session: unknown, data: Buffer): Buffer;
@@ -30,25 +29,67 @@ interface Pkcs11Api {
 const CKM_SHA256_RSA_PKCS = 0x00000040 + 0x06;
 const CKF_SERIAL_SESSION = 0x04;
 const CKF_RW_SESSION = 0x02;
+const CKF_TOKEN_PRESENT = 0x01;
+
+async function loadPkcs11Api(): Promise<NativeModuleResult<Pkcs11Api>> {
+  const nativePath = pkcs11NativePath();
+  if (nativePath) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require(nativePath);
+      const PKCS11 = mod.default ?? mod;
+      return { ok: true, module: nativePath, api: { default: PKCS11 } };
+    } catch (e) {
+      logLine('warn', `pkcs11.node yüklenemedi: ${(e as Error).message}`);
+    }
+  }
+  return loadNativeModule<Pkcs11Api>('pkcs11js');
+}
 
 /** Build an EsignProvider bound to a PKCS#11 library path. */
 export async function createEsignProvider(pkcs11Lib?: string): Promise<EsignProvider> {
-  if (!pkcs11Lib) return new MockEsignProvider();
-  const mod = await loadNativeModule<Pkcs11Api>('pkcs11js');
-  if (!mod.ok) return new MockEsignProvider();
-  try {
-    const PKCS11 = mod.api.default;
-    const instance = new PKCS11();
-    instance.load(pkcs11Lib);
-    return new RealEsignProvider(instance, pkcs11Lib);
-  } catch {
-    return new MockEsignProvider();
+  const lib = pkcs11Lib?.trim() || discoverPkcs11Lib() || undefined;
+  if (lib) {
+    const mod = await loadPkcs11Api();
+    if (mod.ok) {
+      try {
+        const PKCS11 = mod.api.default;
+        const instance = new PKCS11();
+        instance.load(lib);
+        const pkcs11Provider = new RealEsignProvider(instance, lib);
+        const pkcs11Tokens = await pkcs11Provider.listTokens();
+        if (pkcs11Tokens.length > 0) return pkcs11Provider;
+      } catch (e) {
+        logLine('warn', `PKCS#11 oturumu açılamadı (${lib}): ${(e as Error).message}`);
+      }
+    } else if (lib) {
+      logLine('warn', `PKCS#11 modülü yok — Windows sertifika deposu deneniyor.`);
+    }
+  }
+
+  const win = await createWindowsCertProviderIfTokens();
+  if (win) return win;
+
+  if (lib) {
+    return new EmptyEsignProvider(lib);
+  }
+  return new MockEsignProvider();
+}
+
+class EmptyEsignProvider implements EsignProvider {
+  readonly id = 'esign-unavailable';
+  constructor(private readonly libPath: string) {}
+  async listTokens() {
+    if (process.platform === 'win32') return listWindowsEsignTokens();
+    return [];
+  }
+  async sign(): Promise<EsignResult> {
+    throw new Error(`E-imza sürücüsü yanıt vermiyor (${this.libPath}). Akıllı kartın takılı olduğundan emin olun.`);
   }
 }
 
 class RealEsignProvider implements EsignProvider {
   readonly id = 'pkcs11-esign';
-  private nextTokenId = 0;
 
   constructor(
     private readonly pkcs11: Pkcs11Api['default'] extends new () => infer I ? I : never,
@@ -57,13 +98,26 @@ class RealEsignProvider implements EsignProvider {
 
   async listTokens(): Promise<{ id: string; label: string; certSubject: string | null }[]> {
     try {
-      const slots = (this.pkcs11 as any).slots() as { slotId: number; slotDescription: string }[];
-      return slots.map((s) => ({
+      const slots = (this.pkcs11 as { slots: (flags?: number) => { slotId: number; slotDescription: string }[] }).slots(
+        CKF_TOKEN_PRESENT,
+      );
+      const withToken = slots.length > 0 ? slots : ((this.pkcs11 as any).slots() as { slotId: number; slotDescription: string }[]);
+      const pkcs11Tokens = withToken.map((s) => ({
         id: String(s.slotId),
         label: s.slotDescription || `Slot ${s.slotId}`,
-        certSubject: null,
+        certSubject: null as string | null,
       }));
+      if (process.platform === 'win32') {
+        const win = await listWindowsEsignTokens();
+        const merged = [...pkcs11Tokens];
+        for (const w of win) {
+          if (!merged.some((m) => m.id === w.id || m.label === w.label)) merged.push(w);
+        }
+        return merged;
+      }
+      return pkcs11Tokens;
     } catch {
+      if (process.platform === 'win32') return listWindowsEsignTokens();
       return [];
     }
   }
@@ -98,11 +152,9 @@ class RealEsignProvider implements EsignProvider {
     }
   }
 
-  // Keep libPath referenced for diagnostics.
   get lib(): string {
     return this.libPath;
   }
 }
 
-// Keep the unused-type guard referenced.
 void (undefined as unknown as Pkcs11Api);

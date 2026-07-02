@@ -23,7 +23,7 @@ import (
 var iconData []byte
 
 const (
-	version    = "1.1.3"
+	version    = "1.1.4"
 	statusPort = 4781
 )
 

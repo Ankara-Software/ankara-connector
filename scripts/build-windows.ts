@@ -5,7 +5,7 @@ import { copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { rcedit } from 'rcedit';
 
-const VERSION = '1.1.3';
+const VERSION = '1.1.4';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const ASSETS = join(ROOT, 'windows', 'assets');
@@ -44,6 +44,12 @@ await rcedit(join(DIST, CORE_OUT), {
 copyFileSync(join(DIST, CORE_OUT), join(DIST, 'ankara-connector-core.exe'));
 copyFileSync(ICO, join(DIST, 'ankara-yazilim.ico'));
 copyFileSync(join(TRAY_DIR, 'AnkaraYazilimConnector.ps1'), join(DIST, 'AnkaraYazilimConnector.ps1'));
+
+const pkcs11Node = join(ROOT, 'node_modules', 'pkcs11js', 'build', 'Release', 'pkcs11.node');
+if (existsSync(pkcs11Node)) {
+  copyFileSync(pkcs11Node, join(DIST, 'pkcs11.node'));
+  console.log('Bundled pkcs11.node for e-imza support.');
+}
 
 console.log('Building systray host…');
 const trayExe = join(DIST, TRAY_OUT);

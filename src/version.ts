@@ -1,2 +1,2 @@
 /** Single semver source for the Connector agent binary. */
-export const CONNECTOR_VERSION = '1.1.3';
+export const CONNECTOR_VERSION = '1.1.4';
