@@ -59,11 +59,11 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
                     std::process::exit(0);
                 }
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+            Err(e) if e.is_timeout() => {
                 update_visibility(&login, &logout);
                 update_tooltip(&tray_arc);
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(_) => break,
         }
     }
     Ok(())
