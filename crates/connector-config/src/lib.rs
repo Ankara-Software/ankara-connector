@@ -98,7 +98,7 @@ pub fn save_config(cfg: &ConnectorConfig) -> Result<()> {
         entry.set_password(token)?;
         disk.token = None;
     } else {
-        let _ = keyring::Entry::new(SERVICE, TOKEN_ACCOUNT).and_then(|e| e.delete_password());
+        let _ = keyring::Entry::new(SERVICE, TOKEN_ACCOUNT).and_then(|e| e.delete_credential());
     }
     fs::write(config_path(), serde_json::to_string_pretty(&disk)?).context("write config")?;
     Ok(())
