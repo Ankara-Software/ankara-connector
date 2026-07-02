@@ -4,7 +4,7 @@ import { $ } from 'bun';
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const VERSION = '2.0.2';
+const VERSION = '2.0.3';
 const ROOT = join(import.meta.dir, '..');
 const DIST = join(ROOT, 'dist');
 const ICO = join(ROOT, 'windows', 'assets', 'ankara-yazilim.ico');

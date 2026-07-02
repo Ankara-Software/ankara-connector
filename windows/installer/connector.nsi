@@ -4,7 +4,7 @@
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
-!define APP_VERSION "2.0.2"
+!define APP_VERSION "2.0.3"
 !define APP_EXE "AnkaraConnector.exe"
 !define LEGACY_TRAY "AnkaraYazilimConnector.exe"
 !define LEGACY_CORE "ankara-connector-core.exe"
@@ -46,6 +46,8 @@ Name "$(STR_APP_NAME)"
 
 Function .onInit
   !insertmacro KillConnectorProcesses
+  Delete "$SMSTARTUP\Ankara Yazilim Connector.lnk"
+  Delete "$SMSTARTUP\AnkaraYazilimConnector.lnk"
 FunctionEnd
 
 Section "$(STR_SECTION_CORE)" SecCore
