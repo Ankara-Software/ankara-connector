@@ -110,7 +110,7 @@ pub fn encode(msg: &ConnectorMessage) -> anyhow::Result<String> {
 }
 
 pub fn decode(text: &str) -> anyhow::Result<ConnectorMessage> {
-    Ok(serde_json::from_str(text)?)
+    Ok(serde_json::from_str::<ConnectorMessage>(text)?)
 }
 
 #[cfg(test)]
