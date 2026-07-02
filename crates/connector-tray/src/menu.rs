@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use connector_config::{is_paired, load_config};
-use connector_cloud::{logout_session, CONNECTOR_VERSION, DEFAULT_SITE};
+use connector_cloud::{logout_session, management_panel_url, CONNECTOR_VERSION};
 use muda::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
-use tray_icon::{TrayIcon, TrayIconBuilder};
+use tray_icon::{MouseButton, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 use crate::about::{show_about, show_message};
 
@@ -13,7 +13,7 @@ pub struct TrayActions {
 }
 
 pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
-    let open_status = MenuItem::new("Durumu Aç", true, None);
+    let open_status = MenuItem::new("Yönetim panelini aç", true, None);
     let login = MenuItem::new("Oturum aç…", true, None);
     let logout = MenuItem::new("Oturumu Kapat", true, None);
     let about = MenuItem::new("Hakkında…", true, None);
@@ -40,11 +40,24 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
     update_tooltip(&tray_arc);
 
     let menu_channel = MenuEvent::receiver();
+    let tray_channel = TrayIconEvent::receiver();
     loop {
+        while let Ok(ev) = tray_channel.try_recv() {
+            if matches!(
+                ev,
+                TrayIconEvent::DoubleClick {
+                    button: MouseButton::Left,
+                    ..
+                }
+            ) {
+                open_management_panel();
+            }
+        }
+
         match menu_channel.recv_timeout(std::time::Duration::from_secs(4)) {
             Ok(event) => {
                 if event.id == open_status.id() {
-                    let _ = open::that(DEFAULT_SITE);
+                    open_management_panel();
                 } else if event.id == login.id() {
                     let _ = actions.login_tx.send(());
                 } else if event.id == logout.id() {
@@ -91,6 +104,18 @@ fn update_tooltip(tray: &TrayIcon) {
         "Ankara Yazılım Connector — Oturum bekleniyor".into()
     };
     let _ = tray.set_tooltip(Some(&text));
+}
+
+fn open_management_panel() {
+    let url = if is_paired(&load_config()) {
+        management_panel_url()
+    } else {
+        format!(
+            "{}/connector/baglan",
+            connector_cloud::DEFAULT_SITE
+        )
+    };
+    let _ = open::that(&url);
 }
 
 pub fn notify_login_result(ok: bool, err: Option<&str>) {

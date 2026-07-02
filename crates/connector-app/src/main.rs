@@ -1,5 +1,8 @@
 //! Ankara Yazılım Connector v2 — single Rust binary, cloud relay.
 
+// Release builds: GUI-only (no console window on Windows).
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use anyhow::Result;
 use connector_cloud::{run_agent_loop, run_heartbeat_loop, start_login_flow};
 use connector_tray::{notify_login_result, run_tray, TrayActions};
