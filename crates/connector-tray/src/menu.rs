@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use connector_config::{is_paired, load_config};
-use connector_cloud::{logout_session, management_panel_url, CONNECTOR_VERSION};
+use connector_cloud::{management_panel_url, CONNECTOR_VERSION};
 use muda::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
@@ -12,6 +12,50 @@ use crate::about::{show_about, show_message};
 pub struct TrayActions {
     pub login_tx: tokio::sync::mpsc::UnboundedSender<()>,
     pub logout_tx: tokio::sync::mpsc::UnboundedSender<()>,
+    pub session_refresh_rx: std::sync::mpsc::Receiver<()>,
+}
+
+struct AuthMenu {
+    menu: Menu,
+    login: MenuItem,
+    logout: MenuItem,
+    login_visible: bool,
+    logout_visible: bool,
+}
+
+impl AuthMenu {
+    fn new(menu: Menu, login: MenuItem, logout: MenuItem) -> Self {
+        Self {
+            menu,
+            login,
+            logout,
+            login_visible: false,
+            logout_visible: false,
+        }
+    }
+
+    fn sync(&mut self) {
+        let paired = is_paired(&load_config());
+        if paired {
+            if self.login_visible {
+                let _ = self.menu.remove(&self.login);
+                self.login_visible = false;
+            }
+            if !self.logout_visible {
+                let _ = self.menu.insert(&self.logout, 1);
+                self.logout_visible = true;
+            }
+        } else {
+            if self.logout_visible {
+                let _ = self.menu.remove(&self.logout);
+                self.logout_visible = false;
+            }
+            if !self.login_visible {
+                let _ = self.menu.insert(&self.login, 1);
+                self.login_visible = true;
+            }
+        }
+    }
 }
 
 pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
@@ -23,13 +67,12 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
 
     let menu = Menu::new();
     menu.append(&open_status)?;
-    menu.append(&login)?;
-    menu.append(&logout)?;
     menu.append(&about)?;
     menu.append(&PredefinedMenuItem::separator())?;
     menu.append(&quit)?;
 
-    update_visibility(&login, &logout);
+    let mut auth = AuthMenu::new(menu.clone(), login.clone(), logout.clone());
+    auth.sync();
 
     let icon_path = resolve_icon_path();
     let icon = icon_path
@@ -38,7 +81,6 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
 
     let mut builder = TrayIconBuilder::new()
         .with_menu(Box::new(menu.clone()))
-        // Left click → panel; right click → context menu (Windows default).
         .with_menu_on_left_click(false)
         .with_tooltip("Ankara Yazılım Connector");
 
@@ -63,6 +105,11 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
     loop {
         pump_platform_events();
 
+        while actions.session_refresh_rx.try_recv().is_ok() {
+            auth.sync();
+            update_tooltip(&tray_arc);
+        }
+
         while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
             match ev {
                 TrayIconEvent::Click {
@@ -73,14 +120,13 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
                 | TrayIconEvent::DoubleClick {
                     button: MouseButton::Left,
                     ..
-                } => open_management_panel(),
+                } => open_management_panel(&actions),
                 TrayIconEvent::Click {
                     button: MouseButton::Right,
                     button_state: MouseButtonState::Up,
                     ..
                 } => {
-                    // Right-click menu is handled by the shell; refresh state when opened.
-                    update_visibility(&login, &logout);
+                    auth.sync();
                 }
                 _ => {}
             }
@@ -88,15 +134,11 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
 
         while let Ok(event) = MenuEvent::receiver().try_recv() {
             if event.id == open_id {
-                open_management_panel();
+                open_management_panel(&actions);
             } else if event.id == login_id {
                 let _ = actions.login_tx.send(());
             } else if event.id == logout_id {
                 let _ = actions.logout_tx.send(());
-                if logout_session().is_ok() {
-                    update_visibility(&login, &logout);
-                    update_tooltip(&tray_arc);
-                }
             } else if event.id == about_id {
                 show_about(CONNECTOR_VERSION, "rust", CONNECTOR_VERSION);
             } else if event.id == quit_id {
@@ -104,8 +146,8 @@ pub fn run_tray(actions: TrayActions) -> anyhow::Result<()> {
             }
         }
 
-        if last_tooltip.elapsed() >= Duration::from_secs(30) {
-            update_visibility(&login, &logout);
+        if last_tooltip.elapsed() >= Duration::from_secs(15) {
+            auth.sync();
             update_tooltip(&tray_arc);
             last_tooltip = Instant::now();
         }
@@ -149,12 +191,6 @@ fn resolve_icon_path() -> Option<PathBuf> {
     None
 }
 
-fn update_visibility(login: &MenuItem, logout: &MenuItem) {
-    let paired = is_paired(&load_config());
-    let _ = login.set_enabled(!paired);
-    let _ = logout.set_enabled(paired);
-}
-
 fn update_tooltip(tray: &TrayIcon) {
     let cfg = load_config();
     let text = if is_paired(&cfg) {
@@ -173,25 +209,18 @@ fn update_tooltip(tray: &TrayIcon) {
     let _ = tray.set_tooltip(Some(&text));
 }
 
-fn open_management_panel() {
-    let url = if is_paired(&load_config()) {
-        management_panel_url()
+fn open_management_panel(actions: &TrayActions) {
+    if is_paired(&load_config()) {
+        if let Err(e) = open::that(management_panel_url()) {
+            show_message("Panel açılamadı", &e.to_string(), true);
+        }
     } else {
-        format!("{}/connector/baglan", connector_cloud::DEFAULT_SITE)
-    };
-    if let Err(e) = open::that(&url) {
-        show_message("Panel açılamadı", &e.to_string(), true);
+        let _ = actions.login_tx.send(());
     }
 }
 
 pub fn notify_login_result(ok: bool, err: Option<&str>) {
-    if ok {
-        show_message(
-            "Oturum aç",
-            "Tarayıcıda oturum açma tamamlandı.",
-            false,
-        );
-    } else {
+    if !ok {
         show_message(
             "Oturum aç",
             err.unwrap_or("Oturum açılamadı."),
